@@ -129,10 +129,10 @@
     ]
   },
   "outDir": "build",
-  "deviceName": "STM32G431CBUx",
-  "packDir": ".pack/Keil/STM32G4xx_DFP.1.1.0",
+  "deviceName": null,
+  "packDir": null,
   "miscInfo": {
-    "uid": "83d874a26b270a90c213764f66ab73ca"
+    "uid": "9326c500a4d070b04da72238b71aefe1"
   },
   "targets": {
     "IMU_ICM42688P": {
@@ -141,31 +141,111 @@
       "compileConfig": {
         "cpuType": "Cortex-M4",
         "floatingPointHardware": "single",
+        "scatterFilePath": "",
         "useCustomScatterFile": false,
-        "scatterFilePath": "<YOUR_SCATTER_FILE>.sct",
         "storageLayout": {
           "RAM": [
+            {
+              "tag": "RAM",
+              "id": 1,
+              "mem": {
+                "startAddr": "0x0",
+                "size": "0x0"
+              },
+              "isChecked": false,
+              "noInit": false
+            },
+            {
+              "tag": "RAM",
+              "id": 2,
+              "mem": {
+                "startAddr": "0x0",
+                "size": "0x0"
+              },
+              "isChecked": false,
+              "noInit": false
+            },
+            {
+              "tag": "RAM",
+              "id": 3,
+              "mem": {
+                "startAddr": "0x0",
+                "size": "0x0"
+              },
+              "isChecked": false,
+              "noInit": false
+            },
             {
               "tag": "IRAM",
               "id": 1,
               "mem": {
                 "startAddr": "0x20000000",
-                "size": "0x5000"
+                "size": "0x8000"
               },
               "isChecked": true,
+              "noInit": false
+            },
+            {
+              "tag": "IRAM",
+              "id": 2,
+              "mem": {
+                "startAddr": "0x0",
+                "size": "0x0"
+              },
+              "isChecked": false,
               "noInit": false
             }
           ],
           "ROM": [
             {
+              "tag": "ROM",
+              "id": 1,
+              "mem": {
+                "startAddr": "0x0",
+                "size": "0x0"
+              },
+              "isChecked": false,
+              "isStartup": false
+            },
+            {
+              "tag": "ROM",
+              "id": 2,
+              "mem": {
+                "startAddr": "0x0",
+                "size": "0x0"
+              },
+              "isChecked": false,
+              "isStartup": false
+            },
+            {
+              "tag": "ROM",
+              "id": 3,
+              "mem": {
+                "startAddr": "0x0",
+                "size": "0x0"
+              },
+              "isChecked": false,
+              "isStartup": false
+            },
+            {
               "tag": "IROM",
               "id": 1,
               "mem": {
-                "startAddr": "0x08000000",
-                "size": "0x10000"
+                "startAddr": "0x8000000",
+                "size": "0x20000"
               },
               "isChecked": true,
               "isStartup": true
+            },
+            {
+              "tag": "IROM",
+              "id": 2,
+              "mem": {
+                "startAddr": "0x0",
+                "size": "0x0"
+              },
+              "isChecked": false,
+              "isStartup": false
             }
           ]
         },
@@ -177,8 +257,8 @@
         "proType": "SWD",
         "resetMode": "default",
         "runAfterProgram": true,
-        "speed": 4000,
-        "address": "0x08000000",
+        "speed": "24000",
+        "address": "0x8000000",
         "elFile": "None",
         "optionBytes": ".eide/imu_icm42688p.st.option.bytes.ini",
         "otherCmds": ""

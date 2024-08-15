@@ -3,20 +3,22 @@
     "beforeBuildTasks": [],
     "afterBuildTasks": [],
     "global": {
-        "use-microLIB": false,
         "output-debug-info": "enable"
     },
     "c/cpp-compiler": {
-        "optimization": "level-0",
-        "language-c": "c99",
-        "language-cpp": "c++11",
-        "link-time-optimization": false
+        "optimization": "level-3",
+        "language-c": "c11",
+        "language-cpp": "c++03",
+        "one-elf-section-per-function": true,
+        "short-enums#wchar": true,
+        "warnings": "ac5-like-warnings"
     },
     "asm-compiler": {
         "$use": "asm-auto"
     },
     "linker": {
         "output-format": "elf",
-        "misc-controls": "--diag_suppress=L6329"
+        "misc-controls": "--diag_suppress=L6329",
+        "$disableOutputTask": true
     }
 }
