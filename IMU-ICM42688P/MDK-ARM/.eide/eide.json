@@ -257,7 +257,7 @@
         "proType": "SWD",
         "resetMode": "default",
         "runAfterProgram": true,
-        "speed": "24000",
+        "speed": 4000,
         "address": "0x8000000",
         "elFile": "None",
         "optionBytes": ".eide/imu_icm42688p.st.option.bytes.ini",
@@ -292,8 +292,34 @@
           "USE_HAL_DRIVER",
           "STM32G431xx"
         ]
+      },
+      "builderOptions": {
+        "AC6": {
+          "version": 3,
+          "beforeBuildTasks": [],
+          "afterBuildTasks": [],
+          "global": {
+            "output-debug-info": "enable"
+          },
+          "c/cpp-compiler": {
+            "optimization": "level-3",
+            "language-c": "c11",
+            "language-cpp": "c++03",
+            "one-elf-section-per-function": true,
+            "short-enums#wchar": true,
+            "warnings": "ac5-like-warnings"
+          },
+          "asm-compiler": {
+            "$use": "asm-auto"
+          },
+          "linker": {
+            "output-format": "elf",
+            "misc-controls": "--diag_suppress=L6329",
+            "$disableOutputTask": true
+          }
+        }
       }
     }
   },
-  "version": "3.4"
+  "version": "3.5"
 }
