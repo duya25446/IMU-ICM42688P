@@ -10,8 +10,10 @@
 
 #define ICM42688P_READ 0x80
 
-
-uint8_t ICM42688P_ReadRegister(uint8_t reg);
+void ICM42688P_Init();
+void ICM42688P_SoftwareReset();
+void ICM42688P_ReadRegister(uint8_t reg_address,uint8_t* rxdata,uint8_t length);
+uint8_t ICM42688P_WriteRegister(uint8_t reg_address,uint8_t* txdata,uint8_t length);
 
 
 

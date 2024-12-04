@@ -21,6 +21,8 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include <stdio.h>
+#include <string.h>
 #include "ICM-42688P.h"
 /* USER CODE END Includes */
 
@@ -75,7 +77,9 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
-
+	uint8_t rxbuffer[10];
+	uint8_t txbuffer[100];
+	uint8_t databuffer = 5;
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -101,16 +105,18 @@ int main(void)
   MX_USART1_UART_Init();
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
-	unsigned char i;
+	
   /* USER CODE END 2 */
-
+	ICM42688P_Init();
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-		HAL_GPIO_WritePin(GPIOC,GPIO_PIN_4,GPIO_PIN_SET);
-		HAL_UART_Transmit(&huart2,(const unsigned char*)"hello world!\n",12,0xff);
-		i = ICM42688P_ReadRegister(0x75);
+		
+		ICM42688P_ReadRegister(0x2a,rxbuffer,1);
+		ICM42688P_WriteRegister(0x13,&databuffer,1);
+		sprintf((char *)txbuffer,"rxbuffer = %x",rxbuffer[0]);
+		HAL_UART_Transmit(&huart2,(const unsigned char*)txbuffer,strlen((const char*)txbuffer),0xff);
 		HAL_Delay(1000);
     /* USER CODE END WHILE */
 
