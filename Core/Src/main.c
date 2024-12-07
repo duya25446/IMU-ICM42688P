@@ -80,6 +80,7 @@ int main(void)
 	uint8_t rxbuffer[10];
 	uint8_t txbuffer[100];
 	uint8_t databuffer = 5;
+	float temp = 0;
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -105,17 +106,19 @@ int main(void)
   MX_USART1_UART_Init();
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
-	
-  /* USER CODE END 2 */
+	HAL_TIM_PWM_Start(&htim2,TIM_CHANNEL_1);
+	__HAL_TIM_SET_COMPARE(&htim2,TIM_CHANNEL_1,12);
 	ICM42688P_Init();
+	HAL_Delay(10);
+  /* USER CODE END 2 */
+
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-		
 		ICM42688P_ReadRegister(0x2a,rxbuffer,1);
-		ICM42688P_WriteRegister(0x13,&databuffer,1);
-		sprintf((char *)txbuffer,"rxbuffer = %x",rxbuffer[0]);
+		temp = ICM42688P_GetTemp();
+		sprintf((char *)txbuffer,"rxbuffer = %x temp = %f",rxbuffer[0],temp);
 		HAL_UART_Transmit(&huart2,(const unsigned char*)txbuffer,strlen((const char*)txbuffer),0xff);
 		HAL_Delay(1000);
     /* USER CODE END WHILE */

@@ -9,6 +9,11 @@ void spi_sendbytes(unsigned char *bytes,unsigned char length)
 	
 }
 
+void delay(unsigned int ms)
+{
+	HAL_Delay(ms);
+}
+
 void spi_readbytes(unsigned char *bytes,unsigned char length)
 {
 	extern SPI_HandleTypeDef hspi1;
@@ -20,6 +25,11 @@ void ICM42688P_Init()
 {
 	cs_high();
 	ICM42688P_SoftwareReset();
+	delay(10);
+	ICM42688P_ODRcfg();
+	ICM42688P_Start();
+	delay(10);
+	
 }
 
 void ICM42688P_SoftwareReset()
@@ -31,6 +41,42 @@ void ICM42688P_SoftwareReset()
 	spi_sendbytes(&txdata,1);
   cs_high();
 }
+
+void ICM42688P_Start()
+{
+	unsigned char address = 0x4e;
+	unsigned char config = 0b00001111;
+	ICM42688P_WriteRegister(address,&config,1);
+}
+
+void ICM42688P_Stop()
+{
+	unsigned char address = 0x4e;
+	unsigned char config = 0;
+	ICM42688P_WriteRegister(address,&config,1);
+}
+
+void ICM42688P_ODRcfg()
+{
+	unsigned char config = 1;
+	ICM42688P_WriteRegister(0x4f,&config,1);
+	ICM42688P_WriteRegister(0x50,&config,1);
+}
+
+float ICM42688P_GetTemp()
+{
+	float temp = 0;
+	unsigned char buffer[2];
+	unsigned char ex;
+	unsigned short ptr;
+	
+	ICM42688P_ReadRegister(0x1d,buffer+1,1);
+	ICM42688P_ReadRegister(0x1e,buffer,1);
+	ptr = *(unsigned short*)buffer;
+	temp = (((ptr)/132.48))+25;
+	
+	return temp;
+}	
 
 void ICM42688P_ReadRegister(uint8_t reg_address,uint8_t* rxdata,uint8_t length)
 {
