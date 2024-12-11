@@ -23,7 +23,9 @@
 /* USER CODE BEGIN Includes */
 #include <stdio.h>
 #include <string.h>
+#include <stdint.h>
 #include "ICM-42688P.h"
+#include "vqf.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -45,6 +47,7 @@
 SPI_HandleTypeDef hspi1;
 
 TIM_HandleTypeDef htim2;
+TIM_HandleTypeDef htim3;
 
 UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart2;
@@ -60,13 +63,16 @@ static void MX_SPI1_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_USART2_UART_Init(void);
+static void MX_TIM3_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-
+unsigned char timertag = 0;
+IMU_Data imudata;
+vqf_real_t quat6D[4];
 /* USER CODE END 0 */
 
 /**
@@ -81,6 +87,11 @@ int main(void)
 	uint8_t txbuffer[100];
 	uint8_t databuffer = 5;
 	float temp = 0;
+	vqf_real_t gyrTs = 0.001;
+  vqf_real_t accTs = 0.001;
+  vqf_real_t magTs = 0;
+  vqf_real_t gyr[3];
+  vqf_real_t acc[3];
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -105,9 +116,12 @@ int main(void)
   MX_TIM2_Init();
   MX_USART1_UART_Init();
   MX_USART2_UART_Init();
+  MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
 	HAL_TIM_PWM_Start(&htim2,TIM_CHANNEL_1);
-	__HAL_TIM_SET_COMPARE(&htim2,TIM_CHANNEL_1,12);
+	HAL_TIM_Base_Start_IT(&htim3);
+	__HAL_TIM_SET_COMPARE(&htim2,TIM_CHANNEL_1,2594);
+	initVqf(gyrTs, accTs, magTs);
 	ICM42688P_Init();
 	HAL_Delay(10);
   /* USER CODE END 2 */
@@ -116,11 +130,33 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-		ICM42688P_ReadRegister(0x2a,rxbuffer,1);
-		temp = ICM42688P_GetTemp();
-		sprintf((char *)txbuffer,"rxbuffer = %x temp = %f",rxbuffer[0],temp);
-		HAL_UART_Transmit(&huart2,(const unsigned char*)txbuffer,strlen((const char*)txbuffer),0xff);
-		HAL_Delay(1000);
+		if(timertag)
+		{
+			timertag = 0;
+			ICM42688P_ReadIMUData(&imudata);
+			acc[0] = imudata.accel_x;
+			acc[1] = imudata.accel_y;
+			acc[2] = imudata.accel_z;
+			gyr[0] = imudata.gyro_x;
+			gyr[1] = imudata.gyro_y;
+			gyr[2] = imudata.gyro_z;
+			updateGyr(acc);
+			updateGyr(gyr);
+			getQuat6D(quat6D);
+			imudata.q0 = quat6D[0];
+			imudata.q1 = quat6D[1];
+			imudata.q2 = quat6D[2];
+			imudata.q3 = quat6D[3];
+			sprintf((char *)txbuffer,"IMUData:%lf,%lf,%lf,%lf\n",imudata.q0,imudata.q1,imudata.q2,imudata.q3);
+			HAL_UART_Transmit(&huart2,(const unsigned char*)txbuffer,strlen((const char*)txbuffer),0xff);
+		}
+
+//		ICM42688P_ReadRegister(0x2a,rxbuffer,1);
+//		temp = ICM42688P_GetTemp();
+//		ICM42688P_ReadIMUData(&imudata);
+//		sprintf((char *)txbuffer,"rxbuffer = %x temp = %f,timertag = %u\n",rxbuffer[0],temp,timertag);
+//		HAL_UART_Transmit(&huart2,(const unsigned char*)txbuffer,strlen((const char*)txbuffer),0xff);
+//		HAL_Delay(1000);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -263,6 +299,51 @@ static void MX_TIM2_Init(void)
 }
 
 /**
+  * @brief TIM3 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM3_Init(void)
+{
+
+  /* USER CODE BEGIN TIM3_Init 0 */
+
+  /* USER CODE END TIM3_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM3_Init 1 */
+
+  /* USER CODE END TIM3_Init 1 */
+  htim3.Instance = TIM3;
+  htim3.Init.Prescaler = 170-1;
+  htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim3.Init.Period = 999;
+  htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim3, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim3, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM3_Init 2 */
+
+  /* USER CODE END TIM3_Init 2 */
+
+}
+
+/**
   * @brief USART1 Initialization Function
   * @param None
   * @retval None
@@ -278,7 +359,7 @@ static void MX_USART1_UART_Init(void)
 
   /* USER CODE END USART1_Init 1 */
   huart1.Instance = USART1;
-  huart1.Init.BaudRate = 115200;
+  huart1.Init.BaudRate = 2000000;
   huart1.Init.WordLength = UART_WORDLENGTH_8B;
   huart1.Init.StopBits = UART_STOPBITS_1;
   huart1.Init.Parity = UART_PARITY_NONE;
@@ -326,7 +407,7 @@ static void MX_USART2_UART_Init(void)
 
   /* USER CODE END USART2_Init 1 */
   huart2.Instance = USART2;
-  huart2.Init.BaudRate = 115200;
+  huart2.Init.BaudRate = 2000000;
   huart2.Init.WordLength = UART_WORDLENGTH_8B;
   huart2.Init.StopBits = UART_STOPBITS_1;
   huart2.Init.Parity = UART_PARITY_NONE;
