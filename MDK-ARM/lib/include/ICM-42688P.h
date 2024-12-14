@@ -2,6 +2,8 @@
 #define ICM42688P_H
 
 #include "main.h"
+#include "math.h"
+#include "float.h"
 
 #define cs_high() HAL_GPIO_WritePin(GPIOC,GPIO_PIN_4,GPIO_PIN_SET);
 #define cs_low() HAL_GPIO_WritePin(GPIOC,GPIO_PIN_4,GPIO_PIN_RESET);
@@ -11,6 +13,24 @@
 
 #define ACCEL_FULL_SCALE 16.0 // 加速度计的全量程（±16g）
 #define ACCEL_SENSITIVITY (ACCEL_FULL_SCALE / 32768.0) // 加速度计的分辨率为16位
+
+
+//#define axzeroffset -4.192f
+//#define ayzeroffset 0.266f
+//#define azzeroffset 0.128f //IMU1
+
+//#define gxzeroffset 0.886f
+//#define gyzeroffset 0.5f
+//#define gzzeroffset -0.18f //IMU1
+
+
+#define axzeroffset -4.192f
+#define ayzeroffset 0.266f
+#define azzeroffset 0.128f //IMU2
+
+#define gxzeroffset -22.15f
+#define gyzeroffset 0.55f
+#define gzzeroffset 0.55f //IMU2
 
 #define ICM42688P_READ 0x80
 

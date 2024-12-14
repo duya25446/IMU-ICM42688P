@@ -329,7 +329,7 @@
             <uC99>1</uC99>
             <uGnu>0</uGnu>
             <useXO>0</useXO>
-            <v6Lang>3</v6Lang>
+            <v6Lang>5</v6Lang>
             <v6LangP>5</v6LangP>
             <vShortEn>1</vShortEn>
             <vShortWch>1</vShortWch>
@@ -398,6 +398,21 @@
               <FileName>ICM-426688P.c</FileName>
               <FileType>1</FileType>
               <FilePath>.\lib\src\ICM-426688P.c</FilePath>
+            </File>
+            <File>
+              <FileName>FusionAhrs.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\lib\src\FusionAhrs.c</FilePath>
+            </File>
+            <File>
+              <FileName>FusionCompass.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\lib\src\FusionCompass.c</FilePath>
+            </File>
+            <File>
+              <FileName>FusionOffset.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\lib\src\FusionOffset.c</FilePath>
             </File>
             <File>
               <FileName>main.c</FileName>
@@ -545,5 +560,14 @@
     </components>
     <files/>
   </RTE>
+
+  <LayerInfo>
+    <Layers>
+      <Layer>
+        <LayName>IMU_ICM42688P</LayName>
+        <LayPrjMark>1</LayPrjMark>
+      </Layer>
+    </Layers>
+  </LayerInfo>
 
 </Project>

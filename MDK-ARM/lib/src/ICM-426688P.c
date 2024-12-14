@@ -127,12 +127,29 @@ void ICM42688P_ReadIMUData(IMU_Data *data)
 	ICM42688P_ReadRegister(0x1F,odata,12);
 	parse12BytesToSixInt16(odata,int16data);
 	parseImuDataToInt6(int16data,f64data);
-	data->accel_x = f64data[0];
-	data->accel_y = f64data[1];
-	data->accel_z = f64data[2];
-	data->gyro_x = f64data[3];
-	data->gyro_y = f64data[4];
-	data->gyro_z = f64data[5];
+	data->accel_x = f64data[0]+axzeroffset;
+	data->accel_y = f64data[1]+ayzeroffset;
+	data->accel_z = f64data[2]+azzeroffset;
+	data->gyro_x = f64data[3]+gxzeroffset;
+	data->gyro_y = f64data[4]+gyzeroffset;
+	data->gyro_z = f64data[5]+gzzeroffset;
+	float epsilon = FLT_EPSILON;
+	const float threshold = 0.2;
+
+	if (fabs(data->gyro_x) < threshold + epsilon)
+	{
+    data->gyro_x = 0.0;
+	}
+
+	if (fabs(data->gyro_y) < threshold + epsilon)
+	{
+    data->gyro_y = 0.0;
+	}
+
+	if (fabs(data->gyro_z) < threshold + epsilon)
+	{
+    data->gyro_z = 0.0;
+	}
 }
 
 	

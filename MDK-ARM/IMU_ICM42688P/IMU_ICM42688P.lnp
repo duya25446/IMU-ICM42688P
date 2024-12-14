@@ -1,6 +1,9 @@
 --cpu=Cortex-M4.fp.sp
 "imu_icm42688p\startup_stm32g431xx.o"
 "imu_icm42688p\icm-426688p.o"
+"imu_icm42688p\fusionahrs.o"
+"imu_icm42688p\fusioncompass.o"
+"imu_icm42688p\fusionoffset.o"
 "imu_icm42688p\main.o"
 "imu_icm42688p\stm32g4xx_it.o"
 "imu_icm42688p\stm32g4xx_hal_msp.o"

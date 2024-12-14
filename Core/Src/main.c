@@ -25,7 +25,7 @@
 #include <string.h>
 #include <stdint.h>
 #include "ICM-42688P.h"
-#include "vqf.h"
+#include "Fusion.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -51,6 +51,8 @@ TIM_HandleTypeDef htim3;
 
 UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart2;
+DMA_HandleTypeDef hdma_usart1_rx;
+DMA_HandleTypeDef hdma_usart2_rx;
 
 /* USER CODE BEGIN PV */
 
@@ -59,6 +61,7 @@ UART_HandleTypeDef huart2;
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
+static void MX_DMA_Init(void);
 static void MX_SPI1_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_USART1_UART_Init(void);
@@ -71,8 +74,72 @@ static void MX_TIM3_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 unsigned char timertag = 0;
+unsigned char txbuffer[100],rxhandledata[100];
+uint64_t timestamp = 0,previousTimestamp = 0;
 IMU_Data imudata;
-vqf_real_t quat6D[4];
+FusionAhrs ahrs;
+
+
+void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
+{
+	if(huart == &huart1)
+	{
+		sprintf((char *)txbuffer,"IMUData:%f,%f,%f,%f\n",imudata.q0,imudata.q1,imudata.q2,imudata.q3);
+		HAL_UART_Transmit(&huart1,(const unsigned char*)txbuffer,strlen((const char*)txbuffer),0xff);		
+	}
+	else if(huart == &huart2)
+	{
+		sprintf((char *)txbuffer,"IMUData:%f,%f,%f,%f\n",imudata.q0,imudata.q1,imudata.q2,imudata.q3);
+		HAL_UART_Transmit(&huart2,(const unsigned char*)txbuffer,strlen((const char*)txbuffer),0xff);		
+	}
+}
+
+
+void imuupdata()
+{
+	float temp = 0;
+	float deltaTime;
+	
+	FusionVector gyroscope = {0.0f, 0.0f, 0.0f};
+  FusionVector accelerometer = {0.0f, 0.0f, 0.0f};
+	
+	FusionQuaternion quat;
+	
+	
+//			deltaTime = (float)(timestamp - previousTimestamp)/1000.0f;
+//			previousTimestamp = timestamp;
+	
+	
+	accelerometer.array[0] = imudata.accel_x;
+	accelerometer.array[1] = imudata.accel_y;
+	accelerometer.array[2] = imudata.accel_z;
+	gyroscope.array[0] = imudata.gyro_x;
+	gyroscope.array[1] = imudata.gyro_y;
+	gyroscope.array[2] = imudata.gyro_z;
+	FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, 0.001f);
+	quat = FusionAhrsGetQuaternion(&ahrs);
+	imudata.q0 = quat.array[0];
+	imudata.q1 = quat.array[1];
+	imudata.q2 = quat.array[2];
+	imudata.q3 = quat.array[3];
+}
+
+
+void fusioninit()
+{
+		FusionAhrsInitialise(&ahrs);
+	const FusionAhrsSettings settings = {
+            .convention = FusionConventionNwu,
+            .gain = 0.5f,
+            .gyroscopeRange = 2000.0f, /* replace this with actual gyroscope range in degrees/s */
+            .accelerationRejection = 10.0f,
+            .magneticRejection = 0.0f,
+            .recoveryTriggerPeriod = 5*1000, /* 5 seconds */
+    };
+	FusionAhrsSetSettings(&ahrs, &settings);
+	
+}
+
 /* USER CODE END 0 */
 
 /**
@@ -86,12 +153,9 @@ int main(void)
 	uint8_t rxbuffer[10];
 	uint8_t txbuffer[100];
 	uint8_t databuffer = 5;
-	float temp = 0;
-	vqf_real_t gyrTs = 0.001;
-  vqf_real_t accTs = 0.001;
-  vqf_real_t magTs = 0;
-  vqf_real_t gyr[3];
-  vqf_real_t acc[3];
+	uint8_t cont = 0;
+	float valx = 0.0f,valy = 0.0f,valz = 0.0f;
+
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -112,6 +176,7 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_DMA_Init();
   MX_SPI1_Init();
   MX_TIM2_Init();
   MX_USART1_UART_Init();
@@ -119,44 +184,52 @@ int main(void)
   MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
 	HAL_TIM_PWM_Start(&htim2,TIM_CHANNEL_1);
-	HAL_TIM_Base_Start_IT(&htim3);
 	__HAL_TIM_SET_COMPARE(&htim2,TIM_CHANNEL_1,2594);
-	initVqf(gyrTs, accTs, magTs);
+	
+	HAL_UARTEx_ReceiveToIdle_DMA(&huart1,rxhandledata,40);
+	__HAL_DMA_DISABLE_IT(&hdma_usart1_rx, DMA_IT_HT);
+	HAL_UARTEx_ReceiveToIdle_DMA(&huart2,rxhandledata,40);
+	__HAL_DMA_DISABLE_IT(&hdma_usart2_rx, DMA_IT_HT);
+	
 	ICM42688P_Init();
 	HAL_Delay(10);
+	fusioninit();
+	
+
+	ICM42688P_ReadIMUData(&imudata);
+		
+	HAL_TIM_Base_Start_IT(&htim3);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-		if(timertag)
+		if(timertag == 1)
 		{
-			timertag = 0;
-			ICM42688P_ReadIMUData(&imudata);
-			acc[0] = imudata.accel_x;
-			acc[1] = imudata.accel_y;
-			acc[2] = imudata.accel_z;
-			gyr[0] = imudata.gyro_x;
-			gyr[1] = imudata.gyro_y;
-			gyr[2] = imudata.gyro_z;
-			updateGyr(acc);
-			updateGyr(gyr);
-			getQuat6D(quat6D);
-			imudata.q0 = quat6D[0];
-			imudata.q1 = quat6D[1];
-			imudata.q2 = quat6D[2];
-			imudata.q3 = quat6D[3];
-			sprintf((char *)txbuffer,"IMUData:%lf,%lf,%lf,%lf\n",imudata.q0,imudata.q1,imudata.q2,imudata.q3);
-			HAL_UART_Transmit(&huart2,(const unsigned char*)txbuffer,strlen((const char*)txbuffer),0xff);
+//			cont++;
+////			valx+=imudata.gyro_x;
+////			valy+=imudata.gyro_y;
+////			valz+=imudata.gyro_z;
+//			valx+=imudata.accel_x;
+//			valy+=imudata.accel_y;
+//			valz+=imudata.accel_z;
+//			if(cont == 255)
+//			{
+//				
+//				valx /= 256;
+//				valy /= 256;
+//				valz /= 256;
+//				sprintf((char *)txbuffer,"IMUData:%f,%f,%f\n",valx,valy,valz);
+//				HAL_UART_Transmit(&huart2,(const unsigned char*)txbuffer,strlen((const char*)txbuffer),0xff);
+//				cont = 0;
+//				valx = 0;
+//			}
+//			sprintf((char *)txbuffer,"IMUData:%lf,%lf,%lf,%lf\n",imudata.q0,imudata.q1,imudata.q2,imudata.q3);
+//			HAL_UART_Transmit(&huart2,(const unsigned char*)txbuffer,strlen((const char*)txbuffer),0xff);
+			
 		}
-
-//		ICM42688P_ReadRegister(0x2a,rxbuffer,1);
-//		temp = ICM42688P_GetTemp();
-//		ICM42688P_ReadIMUData(&imudata);
-//		sprintf((char *)txbuffer,"rxbuffer = %x temp = %f,timertag = %u\n",rxbuffer[0],temp,timertag);
-//		HAL_UART_Transmit(&huart2,(const unsigned char*)txbuffer,strlen((const char*)txbuffer),0xff);
-//		HAL_Delay(1000);
+	ICM42688P_ReadIMUData(&imudata);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -359,7 +432,7 @@ static void MX_USART1_UART_Init(void)
 
   /* USER CODE END USART1_Init 1 */
   huart1.Instance = USART1;
-  huart1.Init.BaudRate = 2000000;
+  huart1.Init.BaudRate = 921600;
   huart1.Init.WordLength = UART_WORDLENGTH_8B;
   huart1.Init.StopBits = UART_STOPBITS_1;
   huart1.Init.Parity = UART_PARITY_NONE;
@@ -407,7 +480,7 @@ static void MX_USART2_UART_Init(void)
 
   /* USER CODE END USART2_Init 1 */
   huart2.Instance = USART2;
-  huart2.Init.BaudRate = 2000000;
+  huart2.Init.BaudRate = 921600;
   huart2.Init.WordLength = UART_WORDLENGTH_8B;
   huart2.Init.StopBits = UART_STOPBITS_1;
   huart2.Init.Parity = UART_PARITY_NONE;
@@ -436,6 +509,26 @@ static void MX_USART2_UART_Init(void)
   /* USER CODE BEGIN USART2_Init 2 */
 
   /* USER CODE END USART2_Init 2 */
+
+}
+
+/**
+  * Enable DMA controller clock
+  */
+static void MX_DMA_Init(void)
+{
+
+  /* DMA controller clock enable */
+  __HAL_RCC_DMAMUX1_CLK_ENABLE();
+  __HAL_RCC_DMA1_CLK_ENABLE();
+
+  /* DMA interrupt init */
+  /* DMA1_Channel1_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Channel1_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Channel1_IRQn);
+  /* DMA1_Channel2_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Channel2_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Channel2_IRQn);
 
 }
 

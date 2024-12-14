@@ -36,4 +36,10 @@ imu_icm42688p/main.o: ..\Core\Src\main.c ..\Core\Inc\main.h \
   ..\Drivers\STM32G4xx_HAL_Driver\Inc\stm32g4xx_hal_uart_ex.h \
   C:\Keil_v5\ARM\ARMCLANG\Bin\..\include\stdio.h \
   C:\Keil_v5\ARM\ARMCLANG\Bin\..\include\string.h \
-  lib\include\ICM-42688P.h
+  lib\include\ICM-42688P.h C:\Keil_v5\ARM\ARMCLANG\Bin\..\include\math.h \
+  C:\Keil_v5\ARM\ARMCLANG\Bin\..\include\float.h lib\include\Fusion.h \
+  lib\include\FusionAhrs.h lib\include\FusionConvention.h \
+  lib\include\FusionMath.h \
+  C:\Keil_v5\ARM\ARMCLANG\Bin\..\include\stdbool.h \
+  lib\include\FusionAxes.h lib\include\FusionCalibration.h \
+  lib\include\FusionCompass.h lib\include\FusionOffset.h
