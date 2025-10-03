@@ -10,6 +10,7 @@
 #include <string.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <inttypes.h>
 
 // 延时函数声明
 extern void delay_ms(uint32_t ms);
@@ -188,7 +189,7 @@ uint16_t ICM42688P_FormatRegisters(const ICM42688P_Config *config, char *buffer,
     written = snprintf(ptr, buffer_size - (ptr - buffer),
                        "ICM42688P Configuration Register Values\n"
                        "========================================\n"
-                       "Magic: 0x%08X, Version: 0x%04X, Checksum: 0x%04X\n\n",
+                       "Magic: 0x%08" PRIX32 ", Version: 0x%04X, Checksum: 0x%04X\n\n",
                        config->magic, config->version, config->checksum);
     ptr += written;
 

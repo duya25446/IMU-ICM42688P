@@ -1,27 +1,35 @@
 /**
- * @file ICM-42688P.h
- * @brief ICM-42688P IMU传感器驱动头文件
- *
- * 该文件定义了ICM-42688P IMU传感器的驱动接口，包括寄存器操作、
- * 数据读取、配置设置等功能。
+ ******************************************************************************
+ * @file    ICM-42688P.h
+ * @brief   ICM-42688P IMU传感器驱动头文件
+ * @note    该文件定义了ICM-42688P IMU传感器的驱动接口，包括寄存器操作、
+ *          数据读取、配置设置等功能。
+ ******************************************************************************
  */
 
 #ifndef ICM42688P_H
 #define ICM42688P_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/* Includes ------------------------------------------------------------------*/
 #include "main.h"  // 需要HAL_GPIO_WritePin等HAL库函数
 #include "math.h"  // 需要fabs等数学函数
 #include "float.h" // 需要FLT_EPSILON等浮点常量
 
+/* Exported constants --------------------------------------------------------*/
+
 /**
  * @brief 片选信号置高
  */
-#define cs_high() HAL_GPIO_WritePin(GPIOC, GPIO_PIN_4, GPIO_PIN_SET);
+#define cs_high() HAL_GPIO_WritePin(GPIOC, GPIO_PIN_4, GPIO_PIN_SET)
 
 /**
  * @brief 片选信号置低
  */
-#define cs_low() HAL_GPIO_WritePin(GPIOC, GPIO_PIN_4, GPIO_PIN_RESET);
+#define cs_low() HAL_GPIO_WritePin(GPIOC, GPIO_PIN_4, GPIO_PIN_RESET)
 
 /**
  * @brief 陀螺仪全量程，设置为2000dps
@@ -43,7 +51,9 @@
  */
 #define ACCEL_SENSITIVITY (ACCEL_FULL_SCALE / 32768.0)
 
-// 零偏校准参数 - IMU2
+/**
+ * @brief 零偏校准参数 - IMU2
+ */
 #define axzeroffset 0.0f
 #define ayzeroffset 0.0f
 #define azzeroffset 0.0f
@@ -55,6 +65,8 @@
  * @brief SPI读取寄存器标志位
  */
 #define ICM42688P_READ 0x80
+
+/* Exported types ------------------------------------------------------------*/
 
 /**
  * @brief IMU数据结构体
@@ -84,7 +96,7 @@ typedef struct
 
 } IMU_Data;
 
-// 函数声明
+/* Exported functions prototypes ---------------------------------------------*/
 
 /**
  * @brief 初始化ICM42688P传感器
@@ -156,4 +168,8 @@ void ICM42688P_ReadRegister(uint8_t reg_address, uint8_t *rxdata, uint8_t length
  */
 uint8_t ICM42688P_WriteRegister(uint8_t reg_address, uint8_t *txdata, uint8_t length);
 
+#ifdef __cplusplus
+}
 #endif
+
+#endif /* ICM42688P_H */
