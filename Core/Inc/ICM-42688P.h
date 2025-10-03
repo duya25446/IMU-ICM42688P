@@ -8,11 +8,11 @@
 #define cs_high() HAL_GPIO_WritePin(GPIOC,GPIO_PIN_4,GPIO_PIN_SET);
 #define cs_low() HAL_GPIO_WritePin(GPIOC,GPIO_PIN_4,GPIO_PIN_RESET);
 
-#define GYRO_FULL_SCALE 2000.0 // �����ǵ�ȫ���̣���2000dps��
-#define GYRO_SENSITIVITY (GYRO_FULL_SCALE / 32768.0) // �����ǵķֱ���Ϊ16λ
+#define GYRO_FULL_SCALE 2000.0 // 陀螺仪的全量程，设置为2000dps
+#define GYRO_SENSITIVITY (GYRO_FULL_SCALE / 32768.0) // 陀螺仪的分辨率为16位
 
-#define ACCEL_FULL_SCALE 16.0 // ���ٶȼƵ�ȫ���̣���16g��
-#define ACCEL_SENSITIVITY (ACCEL_FULL_SCALE / 32768.0) // ���ٶȼƵķֱ���Ϊ16λ
+#define ACCEL_FULL_SCALE 16.0 // 加速度计的全量程，设置为16g
+#define ACCEL_SENSITIVITY (ACCEL_FULL_SCALE / 32768.0) // 加速度计的分辨率为16位
 
 
 //#define axzeroffset -4.192f
@@ -36,23 +36,23 @@
 
 
 typedef struct {
-    // ������ٶȼ����ݣ���λΪg���������ٶȣ�
-    double accel_x;  // X����ٶ�
-    double accel_y;  // Y����ٶ�
-    double accel_z;  // Z����ٶ�
+    // 加速度计数据，单位为g（重力加速度）
+    double accel_x;  // X轴加速度
+    double accel_y;  // Y轴加速度
+    double accel_z;  // Z轴加速度
 
-    // �������������ݣ���λΪ��ÿ�루dps��
-    double gyro_x;   // X����ٶ�
-    double gyro_y;   // Y����ٶ�
-    double gyro_z;   // Z����ٶ�
+    // 陀螺仪数据，单位为度每秒（dps）
+    double gyro_x;   // X轴角速度
+    double gyro_y;   // Y轴角速度
+    double gyro_z;   // Z轴角速度
 
-    // ��Ԫ�������ڱ�ʾ�豸����ת״̬
-    double q0;  // q0������ʵ��
+    // 四元数，用于表示设备的旋转状态
+    double q0;  // q0（四元数实部）
     double q1;  // q1
     double q2;  // q2
     double q3;  // q3
 
-    // ʱ�����������ϵͳʱ�����ĳ����׼�����������
+    // 时间戳，用于记录系统时间或某个标准时间的数据
     uint64_t timestamp;
 
 } IMU_Data;

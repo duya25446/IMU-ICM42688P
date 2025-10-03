@@ -45,9 +45,7 @@ target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
 # Add sources to executable
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     Core/Src/ICM-426688P.c
-    Core/Src/FusionOffset.c
-    Core/Src/FusionCompass.c
-    Core/Src/FusionAhrs.c
+    Core/Src/ICM42688P_Config.c
     # Add user sources here
 )
 

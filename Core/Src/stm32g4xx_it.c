@@ -62,7 +62,7 @@ extern DMA_HandleTypeDef hdma_usart2_rx;
 extern UART_HandleTypeDef huart1;
 extern UART_HandleTypeDef huart2;
 /* USER CODE BEGIN EV */
-extern void imuupdata();
+
 /* USER CODE END EV */
 
 /******************************************************************************/
@@ -243,7 +243,7 @@ void TIM3_IRQHandler(void)
   /* USER CODE BEGIN TIM3_IRQn 1 */
 	extern unsigned char timertag;
 	extern uint64_t timestamp;
-	imuupdata();
+	// TODO: 在此处添加新的算法更新函数调用
 	timestamp++;
 	timertag = 1;
   /* USER CODE END TIM3_IRQn 1 */
