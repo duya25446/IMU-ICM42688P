@@ -1,0 +1,18 @@
+CompileFlags:
+  Add: 
+    - -mcpu=cortex-m4
+    - -mfpu=fpv4-sp-d16
+    - -mfloat-abi=hard
+    - -DSTM32G431xx
+    - -DUSE_HAL_DRIVER
+    - -DDEBUG
+    - -ICore/Inc
+    - -IDrivers/STM32G4xx_HAL_Driver/Inc
+    - -IDrivers/STM32G4xx_HAL_Driver/Inc/Legacy
+    - -IDrivers/CMSIS/Device/ST/STM32G4xx/Include
+    - -IDrivers/CMSIS/Include
+    - -isystem/opt/stm32cubeclt/GNU-tools-for-STM32/arm-none-eabi/include
+    - -isystem/usr/include
+    - --target=arm-none-eabi
+    - -std=gnu11
+

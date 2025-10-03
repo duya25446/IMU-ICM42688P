@@ -345,7 +345,7 @@ uint8_t ICM42688P_ApplyConfig(const ICM42688P_Config* config)
     }
     
     // Bank 0配置
-    ICM42688P_BankSEL(0);
+    ICM42688P_Bank_Select(0);
     error |= ICM42688P_WriteRegister(ICM42688P_REG_BANK0_DEVICE_CONFIG, 
                                      (uint8_t*)&config->bank0.DEVICE_CONFIG, 1);
     error |= ICM42688P_WriteRegister(ICM42688P_REG_BANK0_DRIVE_CONFIG, 
@@ -398,7 +398,7 @@ uint8_t ICM42688P_ApplyConfig(const ICM42688P_Config* config)
                                      (uint8_t*)&config->bank0.SELF_TEST_CONFIG, 1);
     
     // Bank 1配置
-    ICM42688P_BankSEL(1);
+    ICM42688P_Bank_Select(1);
     error |= ICM42688P_WriteRegister(ICM42688P_REG_BANK1_SENSOR_CONFIG0, 
                                      (uint8_t*)&config->bank1.SENSOR_CONFIG0, 1);
     error |= ICM42688P_WriteRegister(ICM42688P_REG_BANK1_GYRO_CONFIG_STATIC2, 
@@ -427,7 +427,7 @@ uint8_t ICM42688P_ApplyConfig(const ICM42688P_Config* config)
                                      (uint8_t*)&config->bank1.INTF_CONFIG6, 1);
     
     // Bank 2配置
-    ICM42688P_BankSEL(2);
+    ICM42688P_Bank_Select(2);
     error |= ICM42688P_WriteRegister(ICM42688P_REG_BANK2_ACCEL_CONFIG_STATIC2, 
                                      (uint8_t*)&config->bank2.ACCEL_CONFIG_STATIC2, 1);
     error |= ICM42688P_WriteRegister(ICM42688P_REG_BANK2_ACCEL_CONFIG_STATIC3, 
@@ -436,7 +436,7 @@ uint8_t ICM42688P_ApplyConfig(const ICM42688P_Config* config)
                                      (uint8_t*)&config->bank2.ACCEL_CONFIG_STATIC4, 1);
     
     // Bank 4配置
-    ICM42688P_BankSEL(4);
+    ICM42688P_Bank_Select(4);
     error |= ICM42688P_WriteRegister(ICM42688P_REG_BANK4_ACCEL_WOM_X_THR, 
                                      (uint8_t*)&config->bank4.ACCEL_WOM_X_THR, 1);
     error |= ICM42688P_WriteRegister(ICM42688P_REG_BANK4_ACCEL_WOM_Y_THR, 
@@ -463,7 +463,7 @@ uint8_t ICM42688P_ApplyConfig(const ICM42688P_Config* config)
                                      (uint8_t*)&config->bank4.OFFSET_USER8, 1);
     
     // 切回Bank 0
-    ICM42688P_BankSEL(0);
+    ICM42688P_Bank_Select(0);
     
     return error;
 }
@@ -471,7 +471,7 @@ uint8_t ICM42688P_ApplyConfig(const ICM42688P_Config* config)
 uint8_t ICM42688P_ReadConfig(ICM42688P_Config* config)
 {
     // Bank 0读取
-    ICM42688P_BankSEL(0);
+    ICM42688P_Bank_Select(0);
     ICM42688P_ReadRegister(ICM42688P_REG_BANK0_DEVICE_CONFIG, &config->bank0.DEVICE_CONFIG, 1);
     ICM42688P_ReadRegister(ICM42688P_REG_BANK0_DRIVE_CONFIG, &config->bank0.DRIVE_CONFIG, 1);
     ICM42688P_ReadRegister(ICM42688P_REG_BANK0_INT_CONFIG, &config->bank0.INT_CONFIG, 1);
@@ -499,7 +499,7 @@ uint8_t ICM42688P_ReadConfig(ICM42688P_Config* config)
     ICM42688P_ReadRegister(ICM42688P_REG_BANK0_SELF_TEST_CONFIG, &config->bank0.SELF_TEST_CONFIG, 1);
     
     // Bank 1读取
-    ICM42688P_BankSEL(1);
+    ICM42688P_Bank_Select(1);
     ICM42688P_ReadRegister(ICM42688P_REG_BANK1_SENSOR_CONFIG0, &config->bank1.SENSOR_CONFIG0, 1);
     ICM42688P_ReadRegister(ICM42688P_REG_BANK1_GYRO_CONFIG_STATIC2, &config->bank1.GYRO_CONFIG_STATIC2, 1);
     ICM42688P_ReadRegister(ICM42688P_REG_BANK1_GYRO_CONFIG_STATIC3, &config->bank1.GYRO_CONFIG_STATIC3, 1);
@@ -515,13 +515,13 @@ uint8_t ICM42688P_ReadConfig(ICM42688P_Config* config)
     ICM42688P_ReadRegister(ICM42688P_REG_BANK1_INTF_CONFIG6, &config->bank1.INTF_CONFIG6, 1);
     
     // Bank 2读取
-    ICM42688P_BankSEL(2);
+    ICM42688P_Bank_Select(2);
     ICM42688P_ReadRegister(ICM42688P_REG_BANK2_ACCEL_CONFIG_STATIC2, &config->bank2.ACCEL_CONFIG_STATIC2, 1);
     ICM42688P_ReadRegister(ICM42688P_REG_BANK2_ACCEL_CONFIG_STATIC3, &config->bank2.ACCEL_CONFIG_STATIC3, 1);
     ICM42688P_ReadRegister(ICM42688P_REG_BANK2_ACCEL_CONFIG_STATIC4, &config->bank2.ACCEL_CONFIG_STATIC4, 1);
     
     // Bank 4读取
-    ICM42688P_BankSEL(4);
+    ICM42688P_Bank_Select(4);
     ICM42688P_ReadRegister(ICM42688P_REG_BANK4_ACCEL_WOM_X_THR, &config->bank4.ACCEL_WOM_X_THR, 1);
     ICM42688P_ReadRegister(ICM42688P_REG_BANK4_ACCEL_WOM_Y_THR, &config->bank4.ACCEL_WOM_Y_THR, 1);
     ICM42688P_ReadRegister(ICM42688P_REG_BANK4_ACCEL_WOM_Z_THR, &config->bank4.ACCEL_WOM_Z_THR, 1);
@@ -536,7 +536,7 @@ uint8_t ICM42688P_ReadConfig(ICM42688P_Config* config)
     ICM42688P_ReadRegister(ICM42688P_REG_BANK4_OFFSET_USER8, &config->bank4.OFFSET_USER8, 1);
     
     // 切回Bank 0
-    ICM42688P_BankSEL(0);
+    ICM42688P_Bank_Select(0);
     
     // 更新魔数、版本和校验和
     config->magic = ICM42688P_CONFIG_MAGIC;
