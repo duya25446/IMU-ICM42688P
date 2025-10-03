@@ -1,0 +1,6 @@
+Diagnostics:
+  UnusedIncludes: None
+  MissingIncludes: None
+  ClangTidy:
+    Remove: misc-include-cleaner
+

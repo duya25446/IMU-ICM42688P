@@ -1,7 +1,7 @@
 /**
  * @file ICM-42688P.h
  * @brief ICM-42688P IMU传感器驱动头文件
- * 
+ *
  * 该文件定义了ICM-42688P IMU传感器的驱动接口，包括寄存器操作、
  * 数据读取、配置设置等功能。
  */
@@ -10,18 +10,18 @@
 #define ICM42688P_H
 
 #include "main.h"  // 需要HAL_GPIO_WritePin等HAL库函数
-#include "math.h"   // 需要fabs等数学函数
-#include "float.h"  // 需要FLT_EPSILON等浮点常量
+#include "math.h"  // 需要fabs等数学函数
+#include "float.h" // 需要FLT_EPSILON等浮点常量
 
 /**
  * @brief 片选信号置高
  */
-#define cs_high() HAL_GPIO_WritePin(GPIOC,GPIO_PIN_4,GPIO_PIN_SET);
+#define cs_high() HAL_GPIO_WritePin(GPIOC, GPIO_PIN_4, GPIO_PIN_SET);
 
 /**
  * @brief 片选信号置低
  */
-#define cs_low() HAL_GPIO_WritePin(GPIOC,GPIO_PIN_4,GPIO_PIN_RESET);
+#define cs_low() HAL_GPIO_WritePin(GPIOC, GPIO_PIN_4, GPIO_PIN_RESET);
 
 /**
  * @brief 陀螺仪全量程，设置为2000dps
@@ -58,25 +58,26 @@
 
 /**
  * @brief IMU数据结构体
- * 
+ *
  * 包含加速度计、陀螺仪、四元数和时间戳数据
  */
-typedef struct {
+typedef struct
+{
     /** 加速度计数据，单位为g（重力加速度） */
-    double accel_x;  // X轴加速度
-    double accel_y;  // Y轴加速度
-    double accel_z;  // Z轴加速度
+    double accel_x; // X轴加速度
+    double accel_y; // Y轴加速度
+    double accel_z; // Z轴加速度
 
     /** 陀螺仪数据，单位为度每秒（dps） */
-    double gyro_x;   // X轴角速度
-    double gyro_y;   // Y轴角速度
-    double gyro_z;   // Z轴角速度
+    double gyro_x; // X轴角速度
+    double gyro_y; // Y轴角速度
+    double gyro_z; // Z轴角速度
 
     /** 四元数，用于表示设备的旋转状态 */
-    double q0;  // q0（四元数实部）
-    double q1;  // q1
-    double q2;  // q2
-    double q3;  // q3
+    double q0; // q0（四元数实部）
+    double q1; // q1
+    double q2; // q2
+    double q3; // q3
 
     /** 时间戳，用于记录系统时间或某个标准时间的数据 */
     uint64_t timestamp;
@@ -144,7 +145,7 @@ void ICM42688P_Bank_Select(uint8_t bank);
  * @param rxdata 接收数据缓冲区
  * @param length 数据长度
  */
-void ICM42688P_ReadRegister(uint8_t reg_address, uint8_t* rxdata, uint8_t length);
+void ICM42688P_ReadRegister(uint8_t reg_address, uint8_t *rxdata, uint8_t length);
 
 /**
  * @brief 写入寄存器
@@ -153,6 +154,6 @@ void ICM42688P_ReadRegister(uint8_t reg_address, uint8_t* rxdata, uint8_t length
  * @param length 数据长度
  * @return 0表示成功，1表示失败
  */
-uint8_t ICM42688P_WriteRegister(uint8_t reg_address, uint8_t* txdata, uint8_t length);
+uint8_t ICM42688P_WriteRegister(uint8_t reg_address, uint8_t *txdata, uint8_t length);
 
 #endif

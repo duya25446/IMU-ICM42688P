@@ -1,0 +1,55 @@
+---
+# clangd 格式化配置 - 适用于 STM32 嵌入式 C/C++ 项目
+BasedOnStyle: LLVM
+
+# 缩进设置
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+ContinuationIndentWidth: 4
+
+# 行宽
+ColumnLimit: 100
+
+# 大括号风格 (K&R 风格，常用于嵌入式)
+BreakBeforeBraces: Linux
+
+# 函数和语句格式
+AllowShortFunctionsOnASingleLine: Empty
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AllowShortCaseLabelsOnASingleLine: false
+AllowShortBlocksOnASingleLine: Never
+
+# 指针和引用对齐
+PointerAlignment: Right
+ReferenceAlignment: Right
+
+# 对齐设置
+AlignConsecutiveDeclarations: false
+AlignConsecutiveAssignments: false
+AlignConsecutiveMacros: true
+AlignTrailingComments: true
+
+# 空格设置
+SpaceBeforeParens: ControlStatements
+SpaceAfterCStyleCast: false
+SpaceBeforeAssignmentOperators: true
+SpacesInParentheses: false
+SpacesInSquareBrackets: false
+
+# Case 标签
+IndentCaseLabels: false
+IndentCaseBlocks: false
+
+# 其他
+KeepEmptyLinesAtTheStartOfBlocks: false
+MaxEmptyLinesToKeep: 1
+SortIncludes: false
+IndentPPDirectives: BeforeHash
+
+# 函数参数换行
+BinPackParameters: true
+BinPackArguments: true
+AllowAllParametersOfDeclarationOnNextLine: true
+

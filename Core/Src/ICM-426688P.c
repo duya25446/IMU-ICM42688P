@@ -1,13 +1,16 @@
 /**
  * @file ICM-426688P.c
  * @brief ICM-42688P IMU传感器驱动实现
- * 
+ *
  * 该文件实现了ICM-42688P IMU传感器的驱动功能，包括SPI通信、
  * 寄存器操作、数据解析和传感器配置等功能。
  */
 
 #include "ICM-42688P.h"
+#include "ICM42688P_Config.h"
 #include <stdint.h>
+
+ICM42688P_Config config;
 
 /**
  * @brief 通过SPI发送数据
@@ -16,9 +19,9 @@
  */
 void spi_send_bytes(uint8_t *bytes, uint8_t length)
 {
-	extern SPI_HandleTypeDef hspi1;
-	
-	HAL_SPI_Transmit(&hspi1, bytes, length, 0xff);
+    extern SPI_HandleTypeDef hspi1;
+
+    HAL_SPI_Transmit(&hspi1, bytes, length, 0xff);
 }
 
 /**
@@ -27,7 +30,7 @@ void spi_send_bytes(uint8_t *bytes, uint8_t length)
  */
 void delay_ms(uint32_t ms)
 {
-	HAL_Delay(ms);
+    HAL_Delay(ms);
 }
 
 /**
@@ -37,14 +40,14 @@ void delay_ms(uint32_t ms)
  */
 void spi_read_bytes(uint8_t *bytes, uint8_t length)
 {
-	extern SPI_HandleTypeDef hspi1;
-	
-	HAL_SPI_Receive(&hspi1, bytes, length, 0xff);
+    extern SPI_HandleTypeDef hspi1;
+
+    HAL_SPI_Receive(&hspi1, bytes, length, 0xff);
 }
 
 /**
  * @brief 初始化ICM42688P传感器
- * 
+ *
  * 执行传感器初始化流程：
  * 1. 片选置高
  * 2. 软件复位
@@ -54,14 +57,17 @@ void spi_read_bytes(uint8_t *bytes, uint8_t length)
  */
 void ICM42688P_Init(void)
 {
-	cs_high();
-	ICM42688P_Software_Reset();
-	delay_ms(10);
-	ICM42688P_Clock_Config();
-	//ICM42688P_Interrupt_Config();
-	ICM42688P_ODR_Config();
-	ICM42688P_Start();
-	delay_ms(10);
+    cs_high();
+    ICM42688P_Software_Reset();
+    delay_ms(10);
+    // 这里未来添加判断EEPROM是否存在过去配置，如果存在就用非出厂模式启动，如果不存在就使用出厂测试模式流程
+    ICM42688P_LoadDefaultConfig(&config);
+    ICM42688P_ReadGyroFactoryCalibration(&config);
+    //   ICM42688P_Clock_Config();
+    //   // ICM42688P_Interrupt_Config();
+    //   ICM42688P_ODR_Config();
+    //   ICM42688P_Start();
+    delay_ms(10);
 }
 
 /**
@@ -70,92 +76,92 @@ void ICM42688P_Init(void)
  */
 void ICM42688P_Bank_Select(uint8_t bank)
 {
-	uint8_t config = bank;
-	ICM42688P_WriteRegister(0x76, &config, 1);
+    uint8_t config = bank;
+    ICM42688P_WriteRegister(0x76, &config, 1);
 }
 
 /**
  * @brief 软件复位
- * 
+ *
  * 向设备发送软件复位命令，使设备恢复到默认状态
  */
 void ICM42688P_Software_Reset(void)
 {
-	uint8_t address = 0x11;
-	uint8_t txdata = 0x01;
-	ICM42688P_Bank_Select(0);
-	cs_low();
-	spi_send_bytes(&address, 1);
-	spi_send_bytes(&txdata, 1);
-	cs_high();
+    uint8_t address = 0x11;
+    uint8_t txdata = 0x01;
+    ICM42688P_Bank_Select(0);
+    cs_low();
+    spi_send_bytes(&address, 1);
+    spi_send_bytes(&txdata, 1);
+    cs_high();
 }
 
 /**
  * @brief 启动传感器
- * 
+ *
  * 配置传感器进入正常工作模式
  */
 void ICM42688P_Start(void)
 {
-	ICM42688P_Bank_Select(0);
-	uint8_t address = 0x4e;
-	uint8_t config = 0b00001111;
-	ICM42688P_WriteRegister(address, &config, 1);
+    ICM42688P_Bank_Select(0);
+    uint8_t address = 0x4e;
+    uint8_t config = 0b00001111;
+    ICM42688P_WriteRegister(address, &config, 1);
 }
 
 /**
  * @brief 停止传感器
- * 
+ *
  * 配置传感器进入低功耗模式
  */
 void ICM42688P_Stop(void)
 {
-	ICM42688P_Bank_Select(0);
-	uint8_t address = 0x4e;
-	uint8_t config = 0;
-	ICM42688P_WriteRegister(address, &config, 1);
+    ICM42688P_Bank_Select(0);
+    uint8_t address = 0x4e;
+    uint8_t config = 0;
+    ICM42688P_WriteRegister(address, &config, 1);
 }
 
 /**
  * @brief 配置输出数据速率(ODR)
- * 
+ *
  * 配置加速度计和陀螺仪的输出数据速率
  */
 void ICM42688P_ODR_Config(void)
 {
-	ICM42688P_Bank_Select(0);
-	uint8_t config = 1;
-	ICM42688P_WriteRegister(0x4f, &config, 1);
-	ICM42688P_WriteRegister(0x50, &config, 1);
+    ICM42688P_Bank_Select(0);
+    uint8_t config = 1;
+    ICM42688P_WriteRegister(0x4f, &config, 1);
+    ICM42688P_WriteRegister(0x50, &config, 1);
 }
 
 /**
  * @brief 配置时钟
- * 
+ *
  * 配置传感器的时钟源和时钟设置
  */
 void ICM42688P_Clock_Config(void)
 {
-	ICM42688P_Bank_Select(1);
-	uint8_t config = 0x04;
-	ICM42688P_WriteRegister(0x7b, &config, 1);
-	ICM42688P_Bank_Select(0);
-	config = 0x95;
-	ICM42688P_WriteRegister(0x4d, &config, 1);
+    ICM42688P_Bank_Select(1);
+    uint8_t config = 0x04;
+    ICM42688P_WriteRegister(0x7b, &config, 1);
+    ICM42688P_Bank_Select(0);
+    config = 0x95;
+    ICM42688P_WriteRegister(0x4d, &config, 1);
 }
 
 /**
  * @brief 配置中断
- * 
+ *
  * 配置传感器的中断设置
  */
 void ICM42688P_Interrupt_Config(void)
 {
-	ICM42688P_Bank_Select(0);
-	uint8_t config = 0x2;
-	ICM42688P_WriteRegister(0x14, &config, 1);
-	config = 0x8;
-	ICM42688P_WriteRegister(0x65, &config, 1);
+    ICM42688P_Bank_Select(0);
+    uint8_t config = 0x2;
+    ICM42688P_WriteRegister(0x14, &config, 1);
+    config = 0x8;
+    ICM42688P_WriteRegister(0x65, &config, 1);
 }
 
 /**
@@ -165,13 +171,13 @@ void ICM42688P_Interrupt_Config(void)
  */
 void parse_12bytes_to_6int16(uint8_t *data, int16_t *output)
 {
-	for (int i = 0; i < 6; i++) {
-		// 每个int16占两个字节
-		// 先获取高位字节然后左移8位确定高位
-		output[i] = (int16_t)(data[i * 2] << 8); 
-		// 然后把低位字节放在低位
-		output[i] |= data[i * 2 + 1];
-	}
+    for (int i = 0; i < 6; i++) {
+        // 每个int16占两个字节
+        // 先获取高位字节然后左移8位确定高位
+        output[i] = (int16_t)(data[i * 2] << 8);
+        // 然后把低位字节放在低位
+        output[i] |= data[i * 2 + 1];
+    }
 }
 
 /**
@@ -181,80 +187,77 @@ void parse_12bytes_to_6int16(uint8_t *data, int16_t *output)
  */
 void parse_imu_data_to_physical(int16_t *input, double *output)
 {
-	for(int i = 0; i < 6; i++) {
-		if(i < 3) { // 前三个是加速度计数据
-			output[i] = (double)input[i] * ACCEL_SENSITIVITY; // 加速度计
-		} else { // 后三个是陀螺仪数据
-			output[i] = (double)input[i] * GYRO_SENSITIVITY; // 陀螺仪
-		}
-	}
+    for (int i = 0; i < 6; i++) {
+        if (i < 3) {                                          // 前三个是加速度计数据
+            output[i] = (double)input[i] * ACCEL_SENSITIVITY; // 加速度计
+        } else {                                              // 后三个是陀螺仪数据
+            output[i] = (double)input[i] * GYRO_SENSITIVITY;  // 陀螺仪
+        }
+    }
 }
 
 /**
  * @brief 读取IMU数据
  * @param data 指向IMU_Data结构体的指针，用于存储读取的数据
- * 
+ *
  * 读取加速度计和陀螺仪的原始数据，进行解析和转换，
  * 并应用零偏校准和阈值滤波
  */
 void ICM42688P_ReadIMUData(IMU_Data *data)
 {
-	uint8_t raw_data[12];
-	int16_t int16_data[6];
-	double physical_data[6];
-	
-	ICM42688P_Bank_Select(0);
-	ICM42688P_ReadRegister(0x1F, raw_data, 12);
-	parse_12bytes_to_6int16(raw_data, int16_data);
-	parse_imu_data_to_physical(int16_data, physical_data);
-	
-	// 应用零偏校准
-	data->accel_x = physical_data[0] + axzeroffset;
-	data->accel_y = physical_data[1] + ayzeroffset;
-	data->accel_z = physical_data[2] + azzeroffset;
-	data->gyro_x = physical_data[3] + gxzeroffset;
-	data->gyro_y = physical_data[4] + gyzeroffset;
-	data->gyro_z = physical_data[5] + gzzeroffset;
-	
-	// 陀螺仪阈值滤波
-	float epsilon = FLT_EPSILON;
-	const float threshold = 0.2;
+    uint8_t raw_data[12];
+    int16_t int16_data[6];
+    double physical_data[6];
 
-	if (fabs(data->gyro_x) < threshold + epsilon)
-	{
-		data->gyro_x = 0.0;
-	}
+    ICM42688P_Bank_Select(0);
+    ICM42688P_ReadRegister(0x1F, raw_data, 12);
+    parse_12bytes_to_6int16(raw_data, int16_data);
+    parse_imu_data_to_physical(int16_data, physical_data);
 
-	if (fabs(data->gyro_y) < threshold + epsilon)
-	{
-		data->gyro_y = 0.0;
-	}
+    // 应用零偏校准
+    data->accel_x = physical_data[0] + axzeroffset;
+    data->accel_y = physical_data[1] + ayzeroffset;
+    data->accel_z = physical_data[2] + azzeroffset;
+    data->gyro_x = physical_data[3] + gxzeroffset;
+    data->gyro_y = physical_data[4] + gyzeroffset;
+    data->gyro_z = physical_data[5] + gzzeroffset;
 
-	if (fabs(data->gyro_z) < threshold + epsilon)
-	{
-		data->gyro_z = 0.0;
-	}
+    // 陀螺仪阈值滤波
+    float epsilon = FLT_EPSILON;
+    const float threshold = 0.2;
+
+    if (fabs(data->gyro_x) < threshold + epsilon) {
+        data->gyro_x = 0.0;
+    }
+
+    if (fabs(data->gyro_y) < threshold + epsilon) {
+        data->gyro_y = 0.0;
+    }
+
+    if (fabs(data->gyro_z) < threshold + epsilon) {
+        data->gyro_z = 0.0;
+    }
 }
 
 /**
  * @brief 获取温度数据
  * @return 温度值（摄氏度）
- * 
+ *
  * 读取温度传感器数据并转换为摄氏度
  */
 float ICM42688P_GetTemperature(void)
 {
-	float temperature = 0;
-	uint8_t buffer[2];
-	uint16_t temp_raw;
-	
-	ICM42688P_Bank_Select(0);
-	ICM42688P_ReadRegister(0x1d, buffer + 1, 1);
-	ICM42688P_ReadRegister(0x1e, buffer, 1);
-	temp_raw = *(uint16_t*)buffer;
-	temperature = (((temp_raw) / 132.48)) + 25;
-	
-	return temperature;
+    float temperature = 0;
+    uint8_t buffer[2];
+    uint16_t temp_raw;
+
+    ICM42688P_Bank_Select(0);
+    ICM42688P_ReadRegister(0x1d, buffer + 1, 1);
+    ICM42688P_ReadRegister(0x1e, buffer, 1);
+    temp_raw = *(uint16_t *)buffer;
+    temperature = (((temp_raw) / 132.48)) + 25;
+
+    return temperature;
 }
 
 /**
@@ -263,13 +266,13 @@ float ICM42688P_GetTemperature(void)
  * @param rxdata 接收数据缓冲区
  * @param length 数据长度
  */
-void ICM42688P_ReadRegister(uint8_t reg_address, uint8_t* rxdata, uint8_t length)
+void ICM42688P_ReadRegister(uint8_t reg_address, uint8_t *rxdata, uint8_t length)
 {
-	uint8_t tx_data = reg_address | ICM42688P_READ; 
-	cs_low();
-	spi_send_bytes(&tx_data, 1);
-	spi_read_bytes(rxdata, length);
-	cs_high();
+    uint8_t tx_data = reg_address | ICM42688P_READ;
+    cs_low();
+    spi_send_bytes(&tx_data, 1);
+    spi_read_bytes(rxdata, length);
+    cs_high();
 }
 
 /**
@@ -278,28 +281,26 @@ void ICM42688P_ReadRegister(uint8_t reg_address, uint8_t* rxdata, uint8_t length
  * @param txdata 发送数据缓冲区
  * @param length 数据长度
  * @return 0表示成功，1表示失败
- * 
+ *
  * 写入寄存器后读取验证，确保写入成功
  */
-uint8_t ICM42688P_WriteRegister(uint8_t reg_address, uint8_t* txdata, uint8_t length)
+uint8_t ICM42688P_WriteRegister(uint8_t reg_address, uint8_t *txdata, uint8_t length)
 {
-	uint8_t rx_buffer[256];
-	uint8_t count = 0;
-	uint8_t tx_data = reg_address; 
-	
-	cs_low();
-	spi_send_bytes(&tx_data, 1);
-	spi_send_bytes(txdata, length);
-	cs_high();
-	
-	// 读取验证
-	ICM42688P_ReadRegister(reg_address, rx_buffer, length);
-	for(count = 0; count < length; count++)
-	{
-		if(rx_buffer[count] != txdata[count])
-		{
-			return 1; // 写入失败
-		}
-	}
-	return 0; // 写入成功
+    uint8_t rx_buffer[256];
+    uint8_t count = 0;
+    uint8_t tx_data = reg_address;
+
+    cs_low();
+    spi_send_bytes(&tx_data, 1);
+    spi_send_bytes(txdata, length);
+    cs_high();
+
+    // 读取验证
+    ICM42688P_ReadRegister(reg_address, rx_buffer, length);
+    for (count = 0; count < length; count++) {
+        if (rx_buffer[count] != txdata[count]) {
+            return 1; // 写入失败
+        }
+    }
+    return 0; // 写入成功
 }
