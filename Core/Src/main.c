@@ -83,9 +83,12 @@ ICM42688P_Config ReadAllConfig;
 
 void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 {
-    if (huart == &huart1) {
+    if (huart == &huart1)
+    {
         // TODO: 实现新的数据输出逻辑
-    } else if (huart == &huart2) {
+    }
+    else if (huart == &huart2)
+    {
         // TODO: 实现新的数据输出逻辑
     }
 }
@@ -146,8 +149,15 @@ int main(void)
 
     // ICM42688P_Init();
     // HAL_Delay(10);
-    ICM42688P_Init();
-
+    if (ICM42688P_Init() == 0)
+    {
+        HAL_UART_Transmit(&huart2, (const unsigned char *)"ICM42688P Init Success\n", 31, 0xff);
+    }
+    else
+    {
+        HAL_UART_Transmit(&huart2, (const unsigned char *)"ICM42688P Init Failed\n", 31, 0xff);
+    }
+    
     ICM42688P_ReadAllConfigRegisters(&ReadAllConfig);
     size = ICM42688P_FormatRegisters(&ReadAllConfig, (char *)regbuffer, 4096);
     HAL_UART_Transmit(&huart2, (const unsigned char *)regbuffer, size, 0xff);
@@ -160,7 +170,8 @@ int main(void)
 
     /* Infinite loop */
     /* USER CODE BEGIN WHILE */
-    while (1) {
+    while (1)
+    {
         // sprintf((char *)txbuffer, "Temperature:%f\n",
         // ICM42688P_GetTemperature()); HAL_UART_Transmit(&huart2, (const unsigned
         // char *)txbuffer,
@@ -226,7 +237,8 @@ void SystemClock_Config(void)
     RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
     RCC_OscInitStruct.PLL.PLLQ = RCC_PLLQ_DIV2;
     RCC_OscInitStruct.PLL.PLLR = RCC_PLLR_DIV2;
-    if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK) {
+    if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
+    {
         Error_Handler();
     }
 
@@ -239,7 +251,8 @@ void SystemClock_Config(void)
     RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
     RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
-    if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_4) != HAL_OK) {
+    if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_4) != HAL_OK)
+    {
         Error_Handler();
     }
 }
@@ -273,7 +286,8 @@ static void MX_SPI1_Init(void)
     hspi1.Init.CRCPolynomial = 7;
     hspi1.Init.CRCLength = SPI_CRC_LENGTH_DATASIZE;
     hspi1.Init.NSSPMode = SPI_NSS_PULSE_ENABLE;
-    if (HAL_SPI_Init(&hspi1) != HAL_OK) {
+    if (HAL_SPI_Init(&hspi1) != HAL_OK)
+    {
         Error_Handler();
     }
     /* USER CODE BEGIN SPI1_Init 2 */
@@ -304,19 +318,22 @@ static void MX_TIM2_Init(void)
     htim2.Init.Period = 5187;
     htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
     htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
-    if (HAL_TIM_PWM_Init(&htim2) != HAL_OK) {
+    if (HAL_TIM_PWM_Init(&htim2) != HAL_OK)
+    {
         Error_Handler();
     }
     sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
     sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
-    if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK) {
+    if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
+    {
         Error_Handler();
     }
     sConfigOC.OCMode = TIM_OCMODE_PWM1;
     sConfigOC.Pulse = 0;
     sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
     sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
-    if (HAL_TIM_PWM_ConfigChannel(&htim2, &sConfigOC, TIM_CHANNEL_1) != HAL_OK) {
+    if (HAL_TIM_PWM_ConfigChannel(&htim2, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
+    {
         Error_Handler();
     }
     /* USER CODE BEGIN TIM2_Init 2 */
@@ -348,16 +365,19 @@ static void MX_TIM3_Init(void)
     htim3.Init.Period = 999;
     htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
     htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
-    if (HAL_TIM_Base_Init(&htim3) != HAL_OK) {
+    if (HAL_TIM_Base_Init(&htim3) != HAL_OK)
+    {
         Error_Handler();
     }
     sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
-    if (HAL_TIM_ConfigClockSource(&htim3, &sClockSourceConfig) != HAL_OK) {
+    if (HAL_TIM_ConfigClockSource(&htim3, &sClockSourceConfig) != HAL_OK)
+    {
         Error_Handler();
     }
     sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
     sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
-    if (HAL_TIMEx_MasterConfigSynchronization(&htim3, &sMasterConfig) != HAL_OK) {
+    if (HAL_TIMEx_MasterConfigSynchronization(&htim3, &sMasterConfig) != HAL_OK)
+    {
         Error_Handler();
     }
     /* USER CODE BEGIN TIM3_Init 2 */
@@ -390,16 +410,20 @@ static void MX_USART1_UART_Init(void)
     huart1.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
     huart1.Init.ClockPrescaler = UART_PRESCALER_DIV1;
     huart1.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
-    if (HAL_UART_Init(&huart1) != HAL_OK) {
+    if (HAL_UART_Init(&huart1) != HAL_OK)
+    {
         Error_Handler();
     }
-    if (HAL_UARTEx_SetTxFifoThreshold(&huart1, UART_TXFIFO_THRESHOLD_1_8) != HAL_OK) {
+    if (HAL_UARTEx_SetTxFifoThreshold(&huart1, UART_TXFIFO_THRESHOLD_1_8) != HAL_OK)
+    {
         Error_Handler();
     }
-    if (HAL_UARTEx_SetRxFifoThreshold(&huart1, UART_RXFIFO_THRESHOLD_1_8) != HAL_OK) {
+    if (HAL_UARTEx_SetRxFifoThreshold(&huart1, UART_RXFIFO_THRESHOLD_1_8) != HAL_OK)
+    {
         Error_Handler();
     }
-    if (HAL_UARTEx_DisableFifoMode(&huart1) != HAL_OK) {
+    if (HAL_UARTEx_DisableFifoMode(&huart1) != HAL_OK)
+    {
         Error_Handler();
     }
     /* USER CODE BEGIN USART1_Init 2 */
@@ -432,16 +456,20 @@ static void MX_USART2_UART_Init(void)
     huart2.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
     huart2.Init.ClockPrescaler = UART_PRESCALER_DIV1;
     huart2.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
-    if (HAL_UART_Init(&huart2) != HAL_OK) {
+    if (HAL_UART_Init(&huart2) != HAL_OK)
+    {
         Error_Handler();
     }
-    if (HAL_UARTEx_SetTxFifoThreshold(&huart2, UART_TXFIFO_THRESHOLD_1_8) != HAL_OK) {
+    if (HAL_UARTEx_SetTxFifoThreshold(&huart2, UART_TXFIFO_THRESHOLD_1_8) != HAL_OK)
+    {
         Error_Handler();
     }
-    if (HAL_UARTEx_SetRxFifoThreshold(&huart2, UART_RXFIFO_THRESHOLD_1_8) != HAL_OK) {
+    if (HAL_UARTEx_SetRxFifoThreshold(&huart2, UART_RXFIFO_THRESHOLD_1_8) != HAL_OK)
+    {
         Error_Handler();
     }
-    if (HAL_UARTEx_DisableFifoMode(&huart2) != HAL_OK) {
+    if (HAL_UARTEx_DisableFifoMode(&huart2) != HAL_OK)
+    {
         Error_Handler();
     }
     /* USER CODE BEGIN USART2_Init 2 */
@@ -517,7 +545,8 @@ void Error_Handler(void)
     /* USER CODE BEGIN Error_Handler_Debug */
     /* User can add his own implementation to report the HAL error return state */
     __disable_irq();
-    while (1) {
+    while (1)
+    {
     }
     /* USER CODE END Error_Handler_Debug */
 }

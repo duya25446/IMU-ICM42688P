@@ -36,8 +36,9 @@ extern "C" {
 #define ICM42688P_REG_BANK0_GYRO_CONFIG1       0x51
 #define ICM42688P_REG_BANK0_GYRO_ACCEL_CONFIG0 0x52
 #define ICM42688P_REG_BANK0_ACCEL_CONFIG1      0x53
-#define ICM42688P_REG_BANK0_TMST_CONFIG        0x54
-#define ICM42688P_REG_BANK0_SMD_CONFIG         0x57
+#define ICM42688P_REG_BANK0_TMST_CONFIG  0x54
+#define ICM42688P_REG_BANK0_APEX_CONFIG0 0x56
+#define ICM42688P_REG_BANK0_SMD_CONFIG   0x57
 #define ICM42688P_REG_BANK0_FIFO_CONFIG1       0x5F
 #define ICM42688P_REG_BANK0_FIFO_CONFIG2       0x60
 #define ICM42688P_REG_BANK0_FIFO_CONFIG3       0x61
@@ -77,9 +78,23 @@ extern "C" {
 /* ============================================================================
  * Bank 4 寄存器地址定义
  * ============================================================================ */
+#define ICM42688P_REG_BANK4_APEX_CONFIG1  0x40
+#define ICM42688P_REG_BANK4_APEX_CONFIG2  0x41
+#define ICM42688P_REG_BANK4_APEX_CONFIG3  0x42
+#define ICM42688P_REG_BANK4_APEX_CONFIG4  0x43
+#define ICM42688P_REG_BANK4_APEX_CONFIG5  0x44
+#define ICM42688P_REG_BANK4_APEX_CONFIG6  0x45
+#define ICM42688P_REG_BANK4_APEX_CONFIG7  0x46
+#define ICM42688P_REG_BANK4_APEX_CONFIG8  0x47
+#define ICM42688P_REG_BANK4_APEX_CONFIG9  0x48
 #define ICM42688P_REG_BANK4_ACCEL_WOM_X_THR 0x4A
 #define ICM42688P_REG_BANK4_ACCEL_WOM_Y_THR 0x4B
 #define ICM42688P_REG_BANK4_ACCEL_WOM_Z_THR 0x4C
+#define ICM42688P_REG_BANK4_INT_SOURCE6     0x4D
+#define ICM42688P_REG_BANK4_INT_SOURCE7     0x4E
+#define ICM42688P_REG_BANK4_INT_SOURCE8     0x4F
+#define ICM42688P_REG_BANK4_INT_SOURCE9     0x50
+#define ICM42688P_REG_BANK4_INT_SOURCE10    0x51
 #define ICM42688P_REG_BANK4_OFFSET_USER0    0x77
 #define ICM42688P_REG_BANK4_OFFSET_USER1    0x78
 #define ICM42688P_REG_BANK4_OFFSET_USER2    0x79
@@ -109,9 +124,10 @@ typedef struct {
     uint8_t ACCEL_CONFIG0;      // 0x50 - 加速度计配置0
     uint8_t GYRO_CONFIG1;       // 0x51 - 陀螺仪配置1
     uint8_t GYRO_ACCEL_CONFIG0; // 0x52 - 陀螺仪/加速度计滤波器带宽
-    uint8_t ACCEL_CONFIG1;      // 0x53 - 加速度计配置1
-    uint8_t TMST_CONFIG;        // 0x54 - 时间戳配置
-    uint8_t SMD_CONFIG;         // 0x57 - SMD/WOM配置
+    uint8_t ACCEL_CONFIG1; // 0x53 - 加速度计配置1
+    uint8_t TMST_CONFIG;   // 0x54 - 时间戳配置
+    uint8_t APEX_CONFIG0;  // 0x56 - APEX功能使能配置
+    uint8_t SMD_CONFIG;    // 0x57 - SMD/WOM配置
     uint8_t FIFO_CONFIG1;       // 0x5F - FIFO配置1
     uint8_t FIFO_CONFIG2;       // 0x60 - FIFO水印低字节
     uint8_t FIFO_CONFIG3;       // 0x61 - FIFO水印高字节
@@ -154,12 +170,26 @@ typedef struct {
 } ICM42688P_Bank2_Config;
 
 /**
- * @brief Bank 4 配置寄存器结构体 (不包含APEX功能)
+ * @brief Bank 4 配置寄存器结构体 (包含APEX功能)
  */
 typedef struct {
+    uint8_t APEX_CONFIG1;    // 0x40 - APEX低功耗配置
+    uint8_t APEX_CONFIG2;    // 0x41 - 计步器振幅配置
+    uint8_t APEX_CONFIG3;    // 0x42 - 计步器检测配置
+    uint8_t APEX_CONFIG4;    // 0x43 - 倾斜和睡眠配置
+    uint8_t APEX_CONFIG5;    // 0x44 - 安装矩阵配置
+    uint8_t APEX_CONFIG6;    // 0x45 - 睡眠手势延迟
+    uint8_t APEX_CONFIG7;    // 0x46 - 敲击检测加速度阈值
+    uint8_t APEX_CONFIG8;    // 0x47 - 敲击检测时间窗口
+    uint8_t APEX_CONFIG9;    // 0x48 - 灵敏度模式
     uint8_t ACCEL_WOM_X_THR; // 0x4A - X轴WOM阈值
     uint8_t ACCEL_WOM_Y_THR; // 0x4B - Y轴WOM阈值
     uint8_t ACCEL_WOM_Z_THR; // 0x4C - Z轴WOM阈值
+    uint8_t INT_SOURCE6;     // 0x4D - INT1 APEX中断源
+    uint8_t INT_SOURCE7;     // 0x4E - INT2 APEX中断源
+    uint8_t INT_SOURCE8;     // 0x4F - IBI基本中断源
+    uint8_t INT_SOURCE9;     // 0x50 - IBI WOM中断源
+    uint8_t INT_SOURCE10;    // 0x51 - IBI APEX中断源
     uint8_t OFFSET_USER0;    // 0x77 - 陀螺仪X偏移[7:0]
     uint8_t OFFSET_USER1;    // 0x78 - 陀螺仪Y偏移[11:8] | X偏移[11:8]
     uint8_t OFFSET_USER2;    // 0x79 - 陀螺仪Y偏移[7:0]
@@ -360,7 +390,87 @@ void ICM42688P_ConfigFSYNC(ICM42688P_Config *config, uint8_t ui_sel, uint8_t pol
  * @param fsync_en FSYNC时间戳: 0=禁用, 1=使能
  */
 void ICM42688P_ConfigTimestamp(ICM42688P_Config *config, uint8_t enable, uint8_t resolution,
-                               uint8_t delta_en, uint8_t fsync_en);
+                                uint8_t delta_en, uint8_t fsync_en);
+
+/**
+ * @brief 配置APEX功能使能
+ * @param config 配置结构体指针
+ * @param dmp_power_save DMP省电模式: 0=不激活, 1=激活
+ * @param tap_enable 敲击检测使能
+ * @param pedometer_enable 计步器使能
+ * @param tilt_enable 倾斜检测使能
+ * @param r2w_enable 抬起唤醒/睡眠使能
+ * @param dmp_odr DMP输出数据率: 00=25Hz, 10=50Hz
+ */
+void ICM42688P_ConfigAPEX(ICM42688P_Config *config, uint8_t dmp_power_save, uint8_t tap_enable,
+                          uint8_t pedometer_enable, uint8_t tilt_enable, uint8_t r2w_enable,
+                          uint8_t dmp_odr);
+
+/**
+ * @brief 配置计步器参数
+ * @param config 配置结构体指针
+ * @param amp_th 振幅阈值选择 (0-15)
+ * @param step_cnt_th 步数计数阈值 (0-15)
+ * @param step_det_th 步数检测阈值 (0-7)
+ * @param sb_timer_th 步缓冲定时器阈值 (0-7)
+ * @param hi_enrgy_th 高能量阈值 (0-3)
+ */
+void ICM42688P_ConfigPedometer(ICM42688P_Config *config, uint8_t amp_th, uint8_t step_cnt_th,
+                               uint8_t step_det_th, uint8_t sb_timer_th, uint8_t hi_enrgy_th);
+
+/**
+ * @brief 配置倾斜检测
+ * @param config 配置结构体指针
+ * @param wait_time 倾斜等待时间: 00=0s, 01=2s, 10=4s, 11=6s
+ */
+void ICM42688P_ConfigTilt(ICM42688P_Config *config, uint8_t wait_time);
+
+/**
+ * @brief 配置敲击检测
+ * @param config 配置结构体指针
+ * @param min_jerk_thr 最小加速度阈值 (0-63)
+ * @param max_peak_tol 最大峰值容差 (0-3)
+ * @param tmax 测量窗口 (0-3)
+ * @param tavg 能量测量窗口 (0-3)
+ * @param tmin 单击窗口 (0-7)
+ */
+void ICM42688P_ConfigTap(ICM42688P_Config *config, uint8_t min_jerk_thr, uint8_t max_peak_tol,
+                         uint8_t tmax, uint8_t tavg, uint8_t tmin);
+
+/**
+ * @brief 配置抬起唤醒/睡眠功能
+ * @param config 配置结构体指针
+ * @param sleep_time_out 睡眠超时 (0-7): 000=1.28s, ..., 111=10.24s
+ * @param sleep_gesture_delay 睡眠手势延迟 (0-7): 000=0.32s, ..., 111=2.56s
+ */
+void ICM42688P_ConfigR2W(ICM42688P_Config *config, uint8_t sleep_time_out,
+                         uint8_t sleep_gesture_delay);
+
+/**
+ * @brief 配置DMP省电模式
+ * @param config 配置结构体指针
+ * @param low_energy_amp_th 低功耗振幅阈值 (0-15)
+ * @param power_save_time DMP省电时间 (0-15): 0=0s, 1=4s, ..., 15=60s
+ */
+void ICM42688P_ConfigDMPPowerSave(ICM42688P_Config *config, uint8_t low_energy_amp_th,
+                                  uint8_t power_save_time);
+
+/**
+ * @brief 配置安装矩阵
+ * @param config 配置结构体指针
+ * @param matrix 安装矩阵选择 (0-7)
+ */
+void ICM42688P_ConfigMountingMatrix(ICM42688P_Config *config, uint8_t matrix);
+
+/**
+ * @brief 配置APEX中断源路由
+ * @param config 配置结构体指针
+ * @param int1_sources INT1 APEX中断源位掩码
+ * @param int2_sources INT2 APEX中断源位掩码
+ * @param ibi_sources IBI APEX中断源位掩码
+ */
+void ICM42688P_ConfigAPEXInterruptSource(ICM42688P_Config *config, uint8_t int1_sources,
+                                         uint8_t int2_sources, uint8_t ibi_sources);
 
 /* 应用与读取配置 */
 /**

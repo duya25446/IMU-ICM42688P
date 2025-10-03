@@ -66,6 +66,11 @@ extern "C" {
  */
 #define ICM42688P_READ 0x80
 
+/**
+ * @brief WHOAMI寄存器地址
+ */
+#define ICM42688P_WHOAMI 0x75
+
 /* Exported types ------------------------------------------------------------*/
 
 /**
@@ -101,7 +106,7 @@ typedef struct
 /**
  * @brief 初始化ICM42688P传感器
  */
-void ICM42688P_Init(void);
+uint8_t ICM42688P_Init(void);
 
 /**
  * @brief 停止ICM42688P传感器

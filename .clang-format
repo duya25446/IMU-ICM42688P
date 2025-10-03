@@ -11,8 +11,8 @@ ContinuationIndentWidth: 4
 # 行宽
 ColumnLimit: 100
 
-# 大括号风格 (K&R 风格，常用于嵌入式)
-BreakBeforeBraces: Linux
+# 大括号风格 (Allman 风格，大括号在下一行)
+BreakBeforeBraces: Allman
 
 # 函数和语句格式
 AllowShortFunctionsOnASingleLine: Empty

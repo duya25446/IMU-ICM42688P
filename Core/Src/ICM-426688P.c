@@ -10,7 +10,6 @@
 #include "ICM42688P_Config.h"
 #include <stdint.h>
 
-
 /**
  * @brief 通过SPI发送数据
  * @param bytes 要发送的数据缓冲区
@@ -54,12 +53,22 @@ void spi_read_bytes(uint8_t *bytes, uint8_t length)
  * 4. 输出数据速率配置
  * 5. 启动传感器
  */
-void ICM42688P_Init(void)
+uint8_t ICM42688P_Init(void)
 {
+    uint8_t whoami;
     cs_high();
     ICM42688P_Software_Reset();
     delay_ms(10);
-    
+    ICM42688P_Bank_Select(0);
+    ICM42688P_ReadRegister(ICM42688P_WHOAMI, &whoami, 1);
+    if (whoami != 0x47)
+    {
+        return 1;
+    }
+    else
+    {
+        return 0;
+    }
     // 这里未来添加判断EEPROM是否存在过去配置，如果存在就用非出厂模式启动，如果不存在就使用出厂测试模式流程
     // ICM42688P_LoadDefaultConfig(&config);
     // ICM42688P_ReadGyroFactoryCalibration(&config);
@@ -67,7 +76,6 @@ void ICM42688P_Init(void)
     //   // ICM42688P_Interrupt_Config();
     //   ICM42688P_ODR_Config();
     //   ICM42688P_Start();
-    delay_ms(10);
 }
 
 /**
@@ -171,7 +179,8 @@ void ICM42688P_Interrupt_Config(void)
  */
 void parse_12bytes_to_6int16(uint8_t *data, int16_t *output)
 {
-    for (int i = 0; i < 6; i++) {
+    for (int i = 0; i < 6; i++)
+    {
         // 每个int16占两个字节
         // 先获取高位字节然后左移8位确定高位
         output[i] = (int16_t)(data[i * 2] << 8);
@@ -187,11 +196,15 @@ void parse_12bytes_to_6int16(uint8_t *data, int16_t *output)
  */
 void parse_imu_data_to_physical(int16_t *input, double *output)
 {
-    for (int i = 0; i < 6; i++) {
-        if (i < 3) {                                          // 前三个是加速度计数据
+    for (int i = 0; i < 6; i++)
+    {
+        if (i < 3)
+        {                                                     // 前三个是加速度计数据
             output[i] = (double)input[i] * ACCEL_SENSITIVITY; // 加速度计
-        } else {                                              // 后三个是陀螺仪数据
-            output[i] = (double)input[i] * GYRO_SENSITIVITY;  // 陀螺仪
+        }
+        else
+        {                                                    // 后三个是陀螺仪数据
+            output[i] = (double)input[i] * GYRO_SENSITIVITY; // 陀螺仪
         }
     }
 }
@@ -226,15 +239,18 @@ void ICM42688P_ReadIMUData(IMU_Data *data)
     float epsilon = FLT_EPSILON;
     const float threshold = 0.2;
 
-    if (fabs(data->gyro_x) < threshold + epsilon) {
+    if (fabs(data->gyro_x) < threshold + epsilon)
+    {
         data->gyro_x = 0.0;
     }
 
-    if (fabs(data->gyro_y) < threshold + epsilon) {
+    if (fabs(data->gyro_y) < threshold + epsilon)
+    {
         data->gyro_y = 0.0;
     }
 
-    if (fabs(data->gyro_z) < threshold + epsilon) {
+    if (fabs(data->gyro_z) < threshold + epsilon)
+    {
         data->gyro_z = 0.0;
     }
 }
@@ -297,8 +313,10 @@ uint8_t ICM42688P_WriteRegister(uint8_t reg_address, uint8_t *txdata, uint8_t le
 
     // 读取验证
     ICM42688P_ReadRegister(reg_address, rx_buffer, length);
-    for (count = 0; count < length; count++) {
-        if (rx_buffer[count] != txdata[count]) {
+    for (count = 0; count < length; count++)
+    {
+        if (rx_buffer[count] != txdata[count])
+        {
             return 1; // 写入失败
         }
     }

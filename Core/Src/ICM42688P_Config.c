@@ -301,6 +301,7 @@ void ICM42688P_LoadDefaultConfig(ICM42688P_Config *config)
     config->bank0.GYRO_ACCEL_CONFIG0 = 0x11;
     config->bank0.ACCEL_CONFIG1 = 0x0D;
     config->bank0.TMST_CONFIG = 0x23;
+    config->bank0.APEX_CONFIG0 = 0x82; // DMP省电激活, 其他功能禁用
     config->bank0.SMD_CONFIG = 0x00;
     config->bank0.FIFO_CONFIG1 = 0x00;
     config->bank0.FIFO_CONFIG2 = 0x00;
@@ -335,9 +336,23 @@ void ICM42688P_LoadDefaultConfig(ICM42688P_Config *config)
     config->bank2.ACCEL_CONFIG_STATIC4 = 0x62;
 
     // Bank 4 默认值
+    config->bank4.APEX_CONFIG1 = 0xA2;
+    config->bank4.APEX_CONFIG2 = 0x85;
+    config->bank4.APEX_CONFIG3 = 0x51;
+    config->bank4.APEX_CONFIG4 = 0xA4;
+    config->bank4.APEX_CONFIG5 = 0x8C;
+    config->bank4.APEX_CONFIG6 = 0x5C;
+    config->bank4.APEX_CONFIG7 = 0x45;
+    config->bank4.APEX_CONFIG8 = 0x5B;
+    config->bank4.APEX_CONFIG9 = 0x00;
     config->bank4.ACCEL_WOM_X_THR = 0x00;
     config->bank4.ACCEL_WOM_Y_THR = 0x00;
     config->bank4.ACCEL_WOM_Z_THR = 0x00;
+    config->bank4.INT_SOURCE6 = 0x00;
+    config->bank4.INT_SOURCE7 = 0x00;
+    config->bank4.INT_SOURCE8 = 0x00;
+    config->bank4.INT_SOURCE9 = 0x00;
+    config->bank4.INT_SOURCE10 = 0x00;
     config->bank4.OFFSET_USER0 = 0x00;
     config->bank4.OFFSET_USER1 = 0x00;
     config->bank4.OFFSET_USER2 = 0x00;
@@ -529,10 +544,66 @@ void ICM42688P_ConfigFSYNC(ICM42688P_Config *config, uint8_t ui_sel, uint8_t pol
 }
 
 void ICM42688P_ConfigTimestamp(ICM42688P_Config *config, uint8_t enable, uint8_t resolution,
-                               uint8_t delta_en, uint8_t fsync_en)
+                                uint8_t delta_en, uint8_t fsync_en)
 {
     config->bank0.TMST_CONFIG = ((resolution & 0x01) << 3) | ((delta_en & 0x01) << 2) |
                                 ((fsync_en & 0x01) << 1) | (enable & 0x01);
+}
+
+void ICM42688P_ConfigAPEX(ICM42688P_Config *config, uint8_t dmp_power_save, uint8_t tap_enable,
+                          uint8_t pedometer_enable, uint8_t tilt_enable, uint8_t r2w_enable,
+                          uint8_t dmp_odr)
+{
+    config->bank0.APEX_CONFIG0 = ((dmp_power_save & 0x01) << 7) | ((tap_enable & 0x01) << 6) |
+                                 ((pedometer_enable & 0x01) << 5) | ((tilt_enable & 0x01) << 4) |
+                                 ((r2w_enable & 0x01) << 3) | (dmp_odr & 0x03);
+}
+
+void ICM42688P_ConfigPedometer(ICM42688P_Config *config, uint8_t amp_th, uint8_t step_cnt_th,
+                               uint8_t step_det_th, uint8_t sb_timer_th, uint8_t hi_enrgy_th)
+{
+    config->bank4.APEX_CONFIG2 = ((amp_th & 0x0F) << 4) | (step_cnt_th & 0x0F);
+    config->bank4.APEX_CONFIG3 =
+        ((step_det_th & 0x07) << 5) | ((sb_timer_th & 0x07) << 2) | (hi_enrgy_th & 0x03);
+}
+
+void ICM42688P_ConfigTilt(ICM42688P_Config *config, uint8_t wait_time)
+{
+    config->bank4.APEX_CONFIG4 = (config->bank4.APEX_CONFIG4 & 0x3F) | ((wait_time & 0x03) << 6);
+}
+
+void ICM42688P_ConfigTap(ICM42688P_Config *config, uint8_t min_jerk_thr, uint8_t max_peak_tol,
+                         uint8_t tmax, uint8_t tavg, uint8_t tmin)
+{
+    config->bank4.APEX_CONFIG7 = ((min_jerk_thr & 0x3F) << 2) | (max_peak_tol & 0x03);
+    config->bank4.APEX_CONFIG8 =
+        ((tmax & 0x03) << 5) | ((tavg & 0x03) << 3) | (tmin & 0x07);
+}
+
+void ICM42688P_ConfigR2W(ICM42688P_Config *config, uint8_t sleep_time_out,
+                         uint8_t sleep_gesture_delay)
+{
+    config->bank4.APEX_CONFIG4 = (config->bank4.APEX_CONFIG4 & 0xC7) | ((sleep_time_out & 0x07) << 3);
+    config->bank4.APEX_CONFIG6 = sleep_gesture_delay & 0x07;
+}
+
+void ICM42688P_ConfigDMPPowerSave(ICM42688P_Config *config, uint8_t low_energy_amp_th,
+                                  uint8_t power_save_time)
+{
+    config->bank4.APEX_CONFIG1 = ((low_energy_amp_th & 0x0F) << 4) | (power_save_time & 0x0F);
+}
+
+void ICM42688P_ConfigMountingMatrix(ICM42688P_Config *config, uint8_t matrix)
+{
+    config->bank4.APEX_CONFIG5 = matrix & 0x07;
+}
+
+void ICM42688P_ConfigAPEXInterruptSource(ICM42688P_Config *config, uint8_t int1_sources,
+                                         uint8_t int2_sources, uint8_t ibi_sources)
+{
+    config->bank4.INT_SOURCE6 = int1_sources & 0x3F;
+    config->bank4.INT_SOURCE7 = int2_sources & 0x3F;
+    config->bank4.INT_SOURCE10 = ibi_sources & 0x3F;
 }
 
 /* ============================================================================
@@ -576,6 +647,8 @@ uint8_t ICM42688P_ApplyConfig(const ICM42688P_Config *config)
                                      (uint8_t *)&config->bank0.ACCEL_CONFIG1, 1);
     error |= ICM42688P_WriteRegister(ICM42688P_REG_BANK0_TMST_CONFIG,
                                      (uint8_t *)&config->bank0.TMST_CONFIG, 1);
+    error |= ICM42688P_WriteRegister(ICM42688P_REG_BANK0_APEX_CONFIG0,
+                                     (uint8_t *)&config->bank0.APEX_CONFIG0, 1);
     error |= ICM42688P_WriteRegister(ICM42688P_REG_BANK0_SMD_CONFIG,
                                      (uint8_t *)&config->bank0.SMD_CONFIG, 1);
     error |= ICM42688P_WriteRegister(ICM42688P_REG_BANK0_FIFO_CONFIG1,
@@ -641,12 +714,40 @@ uint8_t ICM42688P_ApplyConfig(const ICM42688P_Config *config)
 
     // Bank 4配置
     ICM42688P_Bank_Select(4);
+    error |= ICM42688P_WriteRegister(ICM42688P_REG_BANK4_APEX_CONFIG1,
+                                     (uint8_t *)&config->bank4.APEX_CONFIG1, 1);
+    error |= ICM42688P_WriteRegister(ICM42688P_REG_BANK4_APEX_CONFIG2,
+                                     (uint8_t *)&config->bank4.APEX_CONFIG2, 1);
+    error |= ICM42688P_WriteRegister(ICM42688P_REG_BANK4_APEX_CONFIG3,
+                                     (uint8_t *)&config->bank4.APEX_CONFIG3, 1);
+    error |= ICM42688P_WriteRegister(ICM42688P_REG_BANK4_APEX_CONFIG4,
+                                     (uint8_t *)&config->bank4.APEX_CONFIG4, 1);
+    error |= ICM42688P_WriteRegister(ICM42688P_REG_BANK4_APEX_CONFIG5,
+                                     (uint8_t *)&config->bank4.APEX_CONFIG5, 1);
+    error |= ICM42688P_WriteRegister(ICM42688P_REG_BANK4_APEX_CONFIG6,
+                                     (uint8_t *)&config->bank4.APEX_CONFIG6, 1);
+    error |= ICM42688P_WriteRegister(ICM42688P_REG_BANK4_APEX_CONFIG7,
+                                     (uint8_t *)&config->bank4.APEX_CONFIG7, 1);
+    error |= ICM42688P_WriteRegister(ICM42688P_REG_BANK4_APEX_CONFIG8,
+                                     (uint8_t *)&config->bank4.APEX_CONFIG8, 1);
+    error |= ICM42688P_WriteRegister(ICM42688P_REG_BANK4_APEX_CONFIG9,
+                                     (uint8_t *)&config->bank4.APEX_CONFIG9, 1);
     error |= ICM42688P_WriteRegister(ICM42688P_REG_BANK4_ACCEL_WOM_X_THR,
                                      (uint8_t *)&config->bank4.ACCEL_WOM_X_THR, 1);
     error |= ICM42688P_WriteRegister(ICM42688P_REG_BANK4_ACCEL_WOM_Y_THR,
                                      (uint8_t *)&config->bank4.ACCEL_WOM_Y_THR, 1);
     error |= ICM42688P_WriteRegister(ICM42688P_REG_BANK4_ACCEL_WOM_Z_THR,
                                      (uint8_t *)&config->bank4.ACCEL_WOM_Z_THR, 1);
+    error |= ICM42688P_WriteRegister(ICM42688P_REG_BANK4_INT_SOURCE6,
+                                     (uint8_t *)&config->bank4.INT_SOURCE6, 1);
+    error |= ICM42688P_WriteRegister(ICM42688P_REG_BANK4_INT_SOURCE7,
+                                     (uint8_t *)&config->bank4.INT_SOURCE7, 1);
+    error |= ICM42688P_WriteRegister(ICM42688P_REG_BANK4_INT_SOURCE8,
+                                     (uint8_t *)&config->bank4.INT_SOURCE8, 1);
+    error |= ICM42688P_WriteRegister(ICM42688P_REG_BANK4_INT_SOURCE9,
+                                     (uint8_t *)&config->bank4.INT_SOURCE9, 1);
+    error |= ICM42688P_WriteRegister(ICM42688P_REG_BANK4_INT_SOURCE10,
+                                     (uint8_t *)&config->bank4.INT_SOURCE10, 1);
     error |= ICM42688P_WriteRegister(ICM42688P_REG_BANK4_OFFSET_USER0,
                                      (uint8_t *)&config->bank4.OFFSET_USER0, 1);
     error |= ICM42688P_WriteRegister(ICM42688P_REG_BANK4_OFFSET_USER1,
@@ -690,6 +791,7 @@ uint8_t ICM42688P_ReadConfig(ICM42688P_Config *config)
                            &config->bank0.GYRO_ACCEL_CONFIG0, 1);
     ICM42688P_ReadRegister(ICM42688P_REG_BANK0_ACCEL_CONFIG1, &config->bank0.ACCEL_CONFIG1, 1);
     ICM42688P_ReadRegister(ICM42688P_REG_BANK0_TMST_CONFIG, &config->bank0.TMST_CONFIG, 1);
+    ICM42688P_ReadRegister(ICM42688P_REG_BANK0_APEX_CONFIG0, &config->bank0.APEX_CONFIG0, 1);
     ICM42688P_ReadRegister(ICM42688P_REG_BANK0_SMD_CONFIG, &config->bank0.SMD_CONFIG, 1);
     ICM42688P_ReadRegister(ICM42688P_REG_BANK0_FIFO_CONFIG1, &config->bank0.FIFO_CONFIG1, 1);
     ICM42688P_ReadRegister(ICM42688P_REG_BANK0_FIFO_CONFIG2, &config->bank0.FIFO_CONFIG2, 1);
@@ -740,9 +842,23 @@ uint8_t ICM42688P_ReadConfig(ICM42688P_Config *config)
 
     // Bank 4读取
     ICM42688P_Bank_Select(4);
+    ICM42688P_ReadRegister(ICM42688P_REG_BANK4_APEX_CONFIG1, &config->bank4.APEX_CONFIG1, 1);
+    ICM42688P_ReadRegister(ICM42688P_REG_BANK4_APEX_CONFIG2, &config->bank4.APEX_CONFIG2, 1);
+    ICM42688P_ReadRegister(ICM42688P_REG_BANK4_APEX_CONFIG3, &config->bank4.APEX_CONFIG3, 1);
+    ICM42688P_ReadRegister(ICM42688P_REG_BANK4_APEX_CONFIG4, &config->bank4.APEX_CONFIG4, 1);
+    ICM42688P_ReadRegister(ICM42688P_REG_BANK4_APEX_CONFIG5, &config->bank4.APEX_CONFIG5, 1);
+    ICM42688P_ReadRegister(ICM42688P_REG_BANK4_APEX_CONFIG6, &config->bank4.APEX_CONFIG6, 1);
+    ICM42688P_ReadRegister(ICM42688P_REG_BANK4_APEX_CONFIG7, &config->bank4.APEX_CONFIG7, 1);
+    ICM42688P_ReadRegister(ICM42688P_REG_BANK4_APEX_CONFIG8, &config->bank4.APEX_CONFIG8, 1);
+    ICM42688P_ReadRegister(ICM42688P_REG_BANK4_APEX_CONFIG9, &config->bank4.APEX_CONFIG9, 1);
     ICM42688P_ReadRegister(ICM42688P_REG_BANK4_ACCEL_WOM_X_THR, &config->bank4.ACCEL_WOM_X_THR, 1);
     ICM42688P_ReadRegister(ICM42688P_REG_BANK4_ACCEL_WOM_Y_THR, &config->bank4.ACCEL_WOM_Y_THR, 1);
     ICM42688P_ReadRegister(ICM42688P_REG_BANK4_ACCEL_WOM_Z_THR, &config->bank4.ACCEL_WOM_Z_THR, 1);
+    ICM42688P_ReadRegister(ICM42688P_REG_BANK4_INT_SOURCE6, &config->bank4.INT_SOURCE6, 1);
+    ICM42688P_ReadRegister(ICM42688P_REG_BANK4_INT_SOURCE7, &config->bank4.INT_SOURCE7, 1);
+    ICM42688P_ReadRegister(ICM42688P_REG_BANK4_INT_SOURCE8, &config->bank4.INT_SOURCE8, 1);
+    ICM42688P_ReadRegister(ICM42688P_REG_BANK4_INT_SOURCE9, &config->bank4.INT_SOURCE9, 1);
+    ICM42688P_ReadRegister(ICM42688P_REG_BANK4_INT_SOURCE10, &config->bank4.INT_SOURCE10, 1);
     ICM42688P_ReadRegister(ICM42688P_REG_BANK4_OFFSET_USER0, &config->bank4.OFFSET_USER0, 1);
     ICM42688P_ReadRegister(ICM42688P_REG_BANK4_OFFSET_USER1, &config->bank4.OFFSET_USER1, 1);
     ICM42688P_ReadRegister(ICM42688P_REG_BANK4_OFFSET_USER2, &config->bank4.OFFSET_USER2, 1);

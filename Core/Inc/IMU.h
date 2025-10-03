@@ -23,7 +23,7 @@ extern "C" {
 /* Exported macro ------------------------------------------------------------*/
 
 /* Exported functions prototypes ---------------------------------------------*/
-
+uint8_t IMU_Init(void);
 #ifdef __cplusplus
 }
 #endif
