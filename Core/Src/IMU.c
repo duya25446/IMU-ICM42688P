@@ -44,6 +44,7 @@ uint8_t IMU_Init(void)
     //TODO:未来可以添加判断EEPROM是否存在过去配置，如果存在就用非出厂模式启动，如果不存在就使用出厂测试模式流程
     //加载默认配置
     ICM42688P_LoadDefaultConfig(&icm42688p_config);
+
     ICM42688P_ReadGyroFactoryCalibration(&icm42688p_config);
 
 

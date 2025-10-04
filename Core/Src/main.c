@@ -23,6 +23,7 @@
 /* USER CODE BEGIN Includes */
 #include "ICM-42688P.h"
 #include "ICM42688P_Config.h"
+// #include "ICM42688P_Test.h"  // 测试程序（需要时取消注释）
 #include "stm32g4xx_hal_uart.h"
 #include <stdint.h>
 #include <stdio.h>
@@ -79,7 +80,9 @@ unsigned char timertag = 0;
 unsigned char txbuffer[100], rxhandledata[100];
 uint64_t timestamp = 0, previousTimestamp = 0;
 IMU_Data imudata;
-ICM42688P_Config ReadAllConfig;
+// 测试用配置结构体（需要运行测试时取消注释）
+// ICM42688P_Config ReadAllConfig;
+// ICM42688P_Config TestConfig;
 
 void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 {
@@ -90,6 +93,68 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
     else if (huart == &huart2)
     {
         // TODO: 实现新的数据输出逻辑
+    }
+}
+
+void ICM42688P_MigrateOldConfig(ICM42688P_Config *config)
+{
+
+    // 1. 初始化配置结构体
+    ICM42688P_InitConfig(config);
+
+    // 2. 配置电源管理 (对应 ICM42688P_Start)
+    ICM42688P_ConfigPower(config,
+                          0b11, // gyro_mode: 11 = Low Noise Mode
+                          0b11, // accel_mode: 11 = Low Noise Mode
+                          0,    // temp_disable: 0 = 使能温度传感器
+                          0     // idle_mode: 0 = OFF时关闭RC
+    );
+
+    // 3. 配置陀螺仪 (对应 ICM42688P_ODR_Config)
+    ICM42688P_ConfigGyro(config,
+                         0b000, // fs_sel: ±2000dps
+                         0x01,  // odr: 32kHz
+                         0b10,  // ui_filt_ord: 3阶滤波器（保持默认）
+                         1      // ui_filt_bw: 带宽设置（保持默认）
+    );
+
+    // 4. 配置加速度计 (对应 ICM42688P_ODR_Config)
+    ICM42688P_ConfigAccel(config,
+                          0b000, // fs_sel: ±16g
+                          0x01,  // odr: 32kHz
+                          0b10,  // ui_filt_ord: 3阶滤波器（保持默认）
+                          1      // ui_filt_bw: 带宽设置（保持默认）
+    );
+
+    // 5. 配置时钟 (对应 ICM42688P_Clock_Config)
+    ICM42688P_ConfigClock(config,
+                          0b01, // clk_sel: 自动选择PLL
+                          1,    // rtc_mode: 需要外部RTC时钟
+                          0b10  // pin9_func: CLKIN (外部时钟输入)
+    );
+
+    // 6. 配置中断引脚 (对应 ICM42688P_Interrupt_Config)
+    ICM42688P_ConfigInterrupt(config,
+                              0, // int1_polarity: 低电平有效
+                              1, // int1_drive: 推挽输出
+                              0, // int1_mode: 脉冲模式
+                              0, // int2_polarity: (未使用)
+                              0, // int2_drive: (未使用)
+                              0  // int2_mode: (未使用)
+    );
+
+    // 7. 配置中断源 (对应 ICM42688P_Interrupt_Config)
+    ICM42688P_ConfigInterruptSource(config,
+                                    0x08, // int1_sources: 数据就绪中断 (UI_DRDY_INT1_EN)
+                                    0x00  // int2_sources: 未使用
+    );
+
+    // 8. 应用配置到芯片
+    uint8_t result = ICM42688P_ApplyConfigIncremental(config);
+    if (result != 0)
+    {
+        // 配置失败处理
+        HAL_UART_Transmit(&huart2, (const unsigned char *)"ICM42688P Migrate Old Config Failed\n", 43, 0xff);
     }
 }
 
@@ -104,11 +169,13 @@ int main(void)
     /* USER CODE BEGIN 1 */
     // uint8_t rxbuffer[10];
     // uint8_t txbuffer[100];
-    uint8_t regbuffer[4096];
     // uint8_t databuffer = 5;
     // uint8_t cont = 0;
     // float valx = 0.0f, valy = 0.0f, valz = 0.0f;
-    uint16_t size = 0;
+    
+    // 测试用变量（需要运行测试时取消注释）
+    // uint8_t regbuffer[4096];
+    // uint16_t size = 0;
 
     /* USER CODE END 1 */
 
@@ -157,10 +224,26 @@ int main(void)
     {
         HAL_UART_Transmit(&huart2, (const unsigned char *)"ICM42688P Init Failed\n", 31, 0xff);
     }
-    
-    ICM42688P_ReadAllConfigRegisters(&ReadAllConfig);
-    size = ICM42688P_FormatRegisters(&ReadAllConfig, (char *)regbuffer, 4096);
-    HAL_UART_Transmit(&huart2, (const unsigned char *)regbuffer, size, 0xff);
+
+    // ========================================================================
+    // 测试程序（需要验证库修改时取消注释）
+    // 测试文件: Core/Src/ICM42688P_Test.c
+    // 存档位置: doc/tests/
+    // ========================================================================
+    // HAL_UART_Transmit(&huart2, (const unsigned char *)"\r\n启动测试验证...\r\n", 
+    //                   strlen("\r\n启动测试验证...\r\n"), 1000);
+    // HAL_Delay(100);
+    // 
+    // // 运行完整测试（如需快速验证可改为 ICM42688P_RunQuickTest）
+    // ICM42688P_RunAllTests();
+    // 
+    // // 可选：打印最终配置状态
+    // ICM42688P_ReadAllConfigRegisters(&ReadAllConfig);
+    // size = ICM42688P_FormatRegisters(&ReadAllConfig, (char *)regbuffer, 4096);
+    // HAL_UART_Transmit(&huart2, (const unsigned char *)"\r\n=== 最终配置状态 ===\r\n",
+    //                   strlen("\r\n=== 最终配置状态 ===\r\n"), 1000);
+    // HAL_UART_Transmit(&huart2, (const unsigned char *)regbuffer, size, 1000);
+    // ========================================================================
 
     // ICM42688P_ReadIMUData(&imudata);
 
