@@ -46,7 +46,7 @@ uint8_t IMU_Init(void)
     ICM42688P_LoadDefaultConfig(&icm42688p_config);
 
     ICM42688P_ReadGyroFactoryCalibration(&icm42688p_config);
-
+return 0;
 
 
 
