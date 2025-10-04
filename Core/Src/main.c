@@ -102,12 +102,12 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 int main(void)
 {
     /* USER CODE BEGIN 1 */
-    uint8_t rxbuffer[10];
-    uint8_t txbuffer[100];
+    // uint8_t rxbuffer[10];
+    // uint8_t txbuffer[100];
     uint8_t regbuffer[4096];
-    uint8_t databuffer = 5;
-    uint8_t cont = 0;
-    float valx = 0.0f, valy = 0.0f, valz = 0.0f;
+    // uint8_t databuffer = 5;
+    // uint8_t cont = 0;
+    // float valx = 0.0f, valy = 0.0f, valz = 0.0f;
     uint16_t size = 0;
 
     /* USER CODE END 1 */

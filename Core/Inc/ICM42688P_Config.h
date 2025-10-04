@@ -22,6 +22,17 @@ extern "C" {
 #define ICM42688P_CONFIG_VERSION 0x0100     // v1.0
 
 /* ============================================================================
+ * 运行时可修改寄存器定义
+ * ============================================================================ */
+// Bank0运行时可修改寄存器地址（可在传感器工作时修改）
+#define ICM42688P_RUNTIME_REG_PWR_MGMT0      0x4E
+#define ICM42688P_RUNTIME_REG_GYRO_CONFIG0   0x4F
+#define ICM42688P_RUNTIME_REG_ACCEL_CONFIG0  0x50
+
+// PWR_MGMT0中可运行时修改的位掩码（仅GYRO_MODE和ACCEL_MODE, bits 3:0）
+#define ICM42688P_PWR_MGMT0_RUNTIME_MASK 0x0F
+
+/* ============================================================================
  * Bank 0 寄存器地址定义
  * ============================================================================ */
 #define ICM42688P_REG_BANK0_DEVICE_CONFIG      0x11
@@ -34,11 +45,11 @@ extern "C" {
 #define ICM42688P_REG_BANK0_GYRO_CONFIG0       0x4F
 #define ICM42688P_REG_BANK0_ACCEL_CONFIG0      0x50
 #define ICM42688P_REG_BANK0_GYRO_CONFIG1       0x51
-#define ICM42688P_REG_BANK0_GYRO_ACCEL_CONFIG0 0x52
+#define ICM42688P_REG_BANK0_GYRO_ACCEL_CONFIG0    0x52
 #define ICM42688P_REG_BANK0_ACCEL_CONFIG1      0x53
-#define ICM42688P_REG_BANK0_TMST_CONFIG  0x54
-#define ICM42688P_REG_BANK0_APEX_CONFIG0 0x56
-#define ICM42688P_REG_BANK0_SMD_CONFIG   0x57
+#define ICM42688P_REG_BANK0_TMST_CONFIG       0x54
+#define ICM42688P_REG_BANK0_APEX_CONFIG0      0x56
+#define ICM42688P_REG_BANK0_SMD_CONFIG       0x57
 #define ICM42688P_REG_BANK0_FIFO_CONFIG1       0x5F
 #define ICM42688P_REG_BANK0_FIFO_CONFIG2       0x60
 #define ICM42688P_REG_BANK0_FIFO_CONFIG3       0x61
@@ -111,8 +122,9 @@ extern "C" {
 
 /**
  * @brief Bank 0 配置寄存器结构体
+ * @note 使用packed属性确保跨平台序列化一致性
  */
-typedef struct {
+typedef struct __attribute__((packed)) {
     uint8_t DEVICE_CONFIG;      // 0x11 - 设备配置
     uint8_t DRIVE_CONFIG;       // 0x13 - 驱动强度配置
     uint8_t INT_CONFIG;         // 0x14 - 中断引脚配置
@@ -143,8 +155,9 @@ typedef struct {
 
 /**
  * @brief Bank 1 配置寄存器结构体
+ * @note 使用packed属性确保跨平台序列化一致性
  */
-typedef struct {
+typedef struct __attribute__((packed)) {
     uint8_t SENSOR_CONFIG0;       // 0x03 - 传感器轴使能
     uint8_t GYRO_CONFIG_STATIC2;  // 0x0B - 陀螺仪AAF/NF使能
     uint8_t GYRO_CONFIG_STATIC3;  // 0x0C - 陀螺仪AAF DELT
@@ -162,8 +175,9 @@ typedef struct {
 
 /**
  * @brief Bank 2 配置寄存器结构体
+ * @note 使用packed属性确保跨平台序列化一致性
  */
-typedef struct {
+typedef struct __attribute__((packed)) {
     uint8_t ACCEL_CONFIG_STATIC2; // 0x03 - 加速度计AAF DELT/使能
     uint8_t ACCEL_CONFIG_STATIC3; // 0x04 - 加速度计AAF DELTSQR[7:0]
     uint8_t ACCEL_CONFIG_STATIC4; // 0x05 - 加速度计AAF BITSHIFT/DELTSQR[11:8]
@@ -171,8 +185,9 @@ typedef struct {
 
 /**
  * @brief Bank 4 配置寄存器结构体 (包含APEX功能)
+ * @note 使用packed属性确保跨平台序列化一致性
  */
-typedef struct {
+typedef struct __attribute__((packed)) {
     uint8_t APEX_CONFIG1;    // 0x40 - APEX低功耗配置
     uint8_t APEX_CONFIG2;    // 0x41 - 计步器振幅配置
     uint8_t APEX_CONFIG3;    // 0x42 - 计步器检测配置
@@ -203,8 +218,9 @@ typedef struct {
 
 /**
  * @brief ICM42688P完整配置结构体
+ * @note 使用packed属性确保跨平台序列化一致性
  */
-typedef struct {
+typedef struct __attribute__((packed)) {
     uint32_t magic;               // 魔数标识: 0x49434D42 ("ICMB")
     uint16_t version;             // 配置版本号
     uint16_t checksum;            // CRC16校验和
@@ -213,6 +229,30 @@ typedef struct {
     ICM42688P_Bank2_Config bank2; // Bank 2配置
     ICM42688P_Bank4_Config bank4; // Bank 4配置
 } ICM42688P_Config;
+
+/* ============================================================================
+ * 增量更新相关数据结构
+ * ============================================================================ */
+
+/**
+ * @brief 单个寄存器写入记录
+ * @note 使用packed属性确保数据结构紧凑
+ */
+typedef struct __attribute__((packed)) {
+    uint8_t bank;      // 寄存器所在Bank (0-4)
+    uint8_t reg_addr;  // 寄存器地址
+    uint8_t value;     // 要写入的值
+} ICM42688P_RegWrite;
+
+/**
+ * @brief 配置差异结构体（用于增量更新）
+ * @note 使用packed属性确保数据结构紧凑
+ */
+typedef struct __attribute__((packed)) {
+    ICM42688P_RegWrite writes[68]; // 需要写入的寄存器列表（68个寄存器：26+13+3+26）
+    uint8_t write_count;            // 实际需要写入的寄存器数量
+    uint8_t needs_power_off;        // 是否需要关闭传感器才能修改
+} ICM42688P_ConfigDiff;
 
 /* ============================================================================
  * 函数声明
@@ -303,23 +343,23 @@ void ICM42688P_ConfigInterruptSource(ICM42688P_Config *config, uint8_t int1_sour
 /**
  * @brief 配置陀螺仪抗混叠滤波器(AAF)
  * @param config 配置结构体指针
- * @param enable 使能: 0=使能, 1=禁用
+ * @param disable AAF禁用位: 0=使能AAF, 1=禁用AAF
  * @param delt DELT参数
  * @param deltsqr DELTSQR参数 (12位)
  * @param bitshift BITSHIFT参数
  */
-void ICM42688P_ConfigGyroAAF(ICM42688P_Config *config, uint8_t enable, uint8_t delt,
+void ICM42688P_ConfigGyroAAF(ICM42688P_Config *config, uint8_t disable, uint8_t delt,
                              uint16_t deltsqr, uint8_t bitshift);
 
 /**
  * @brief 配置加速度计抗混叠滤波器(AAF)
  * @param config 配置结构体指针
- * @param enable 使能: 0=使能, 1=禁用
+ * @param disable AAF禁用位: 0=使能AAF, 1=禁用AAF
  * @param delt DELT参数
  * @param deltsqr DELTSQR参数 (12位)
  * @param bitshift BITSHIFT参数
  */
-void ICM42688P_ConfigAccelAAF(ICM42688P_Config *config, uint8_t enable, uint8_t delt,
+void ICM42688P_ConfigAccelAAF(ICM42688P_Config *config, uint8_t disable, uint8_t delt,
                               uint16_t deltsqr, uint8_t bitshift);
 
 /**
@@ -388,9 +428,10 @@ void ICM42688P_ConfigFSYNC(ICM42688P_Config *config, uint8_t ui_sel, uint8_t pol
  * @param resolution 分辨率: 0=1μs, 1=16μs或RTC周期
  * @param delta_en 增量模式: 0=绝对时间, 1=时间差
  * @param fsync_en FSYNC时间戳: 0=禁用, 1=使能
+ * @param tmst_to_regs_en 时间戳寄存器读取使能: 0=返回0, 1=返回实际值
  */
 void ICM42688P_ConfigTimestamp(ICM42688P_Config *config, uint8_t enable, uint8_t resolution,
-                                uint8_t delta_en, uint8_t fsync_en);
+                               uint8_t delta_en, uint8_t fsync_en, uint8_t tmst_to_regs_en);
 
 /**
  * @brief 配置APEX功能使能
@@ -480,12 +521,7 @@ void ICM42688P_ConfigAPEXInterruptSource(ICM42688P_Config *config, uint8_t int1_
  */
 uint8_t ICM42688P_ApplyConfig(const ICM42688P_Config *config);
 
-/**
- * @brief 从芯片读取当前配置
- * @param config 配置结构体指针
- * @return 0=成功, 非0=读取错误
- */
-uint8_t ICM42688P_ReadConfig(ICM42688P_Config *config);
+
 
 /**
  * @brief 读取芯片中所有配置寄存器的初始值
@@ -522,7 +558,7 @@ uint16_t ICM42688P_ExportConfig(const ICM42688P_Config *config, uint8_t *buffer,
  * @param config 配置结构体指针
  * @param buffer 源缓冲区
  * @param buffer_size 缓冲区大小
- * @return 0=成功, 1=数据不完整, 2=配置无效
+ * @return 0=成功, 1=NULL错误, 2=数据不完整, 3=配置无效
  */
 uint8_t ICM42688P_ImportConfig(ICM42688P_Config *config, const uint8_t *buffer,
                                uint16_t buffer_size);
@@ -556,6 +592,84 @@ uint16_t ICM42688P_GetConfigSize(void);
  * @note 这些是芯片出厂时的工厂校准值，每个芯片可能不同
  */
 uint8_t ICM42688P_ReadGyroFactoryCalibration(ICM42688P_Config *config);
+
+/* ============================================================================
+ * Level 2: 智能增量更新函数
+ * ============================================================================ */
+
+/**
+ * @brief 对比两个配置，生成增量更新列表
+ * @param old_cfg 旧配置
+ * @param new_cfg 新配置
+ * @param diff 输出的差异列表
+ * @return 变化的寄存器数量
+ * @note 此函数为内部使用，用于生成增量更新所需的寄存器列表
+ */
+uint8_t ICM42688P_CompareConfig(const ICM42688P_Config *old_cfg,
+                                const ICM42688P_Config *new_cfg,
+                                ICM42688P_ConfigDiff *diff);
+
+/**
+ * @brief 智能增量更新配置（Level 2）
+ * @param new_config 新配置结构体指针
+ * @return 状态码: bit0=0成功/1失败, bit1=0配置一致/1有不一致警告
+ * @note 自动检测变化的寄存器并增量更新，根据需要自动关闭/开启传感器
+ *       如果检测到芯片配置与内部存储不一致会发出警告但继续执行
+ *       此函数比全局ApplyConfig快得多，适合运行时配置调整
+ */
+uint8_t ICM42688P_ApplyConfigIncremental(const ICM42688P_Config *new_config);
+
+/* ============================================================================
+ * Level 3: 运行时快速修改函数（最高实时性）
+ * ============================================================================ */
+
+/**
+ * @brief 运行时修改陀螺仪ODR（Level 3 - 最快）
+ * @param odr 输出数据率: 0110=1kHz, 0111=200Hz, 1000=100Hz等
+ * @return 0=成功, 非0=失败（可能芯片损坏）
+ * @note 此函数可在传感器运行时调用，无延时，最快速度
+ */
+uint8_t ICM42688P_SetGyroODR(uint8_t odr);
+
+/**
+ * @brief 运行时修改陀螺仪满量程范围（Level 3 - 最快）
+ * @param fs_sel 满量程选择: 000=±2000dps, 001=±1000dps, 010=±500dps等
+ * @return 0=成功, 非0=失败（可能芯片损坏）
+ * @note 此函数可在传感器运行时调用，无延时，最快速度
+ */
+uint8_t ICM42688P_SetGyroFSR(uint8_t fs_sel);
+
+/**
+ * @brief 运行时修改陀螺仪电源模式（Level 3 - 最快）
+ * @param mode 陀螺仪模式: 00=OFF, 01=Standby, 11=LN
+ * @return 0=成功, 非0=失败（可能芯片损坏）
+ * @note 此函数可在传感器运行时调用，无延时，最快速度
+ */
+uint8_t ICM42688P_SetGyroMode(uint8_t mode);
+
+/**
+ * @brief 运行时修改加速度计ODR（Level 3 - 最快）
+ * @param odr 输出数据率: 0110=1kHz, 0111=200Hz, 1000=100Hz等
+ * @return 0=成功, 非0=失败（可能芯片损坏）
+ * @note 此函数可在传感器运行时调用，无延时，最快速度
+ */
+uint8_t ICM42688P_SetAccelODR(uint8_t odr);
+
+/**
+ * @brief 运行时修改加速度计满量程范围（Level 3 - 最快）
+ * @param fs_sel 满量程选择: 000=±16g, 001=±8g, 010=±4g, 011=±2g
+ * @return 0=成功, 非0=失败（可能芯片损坏）
+ * @note 此函数可在传感器运行时调用，无延时，最快速度
+ */
+uint8_t ICM42688P_SetAccelFSR(uint8_t fs_sel);
+
+/**
+ * @brief 运行时修改加速度计电源模式（Level 3 - 最快）
+ * @param mode 加速度计模式: 00=OFF, 10=LP, 11=LN
+ * @return 0=成功, 非0=失败（可能芯片损坏）
+ * @note 此函数可在传感器运行时调用，无延时，最快速度
+ */
+uint8_t ICM42688P_SetAccelMode(uint8_t mode);
 
 #ifdef __cplusplus
 }

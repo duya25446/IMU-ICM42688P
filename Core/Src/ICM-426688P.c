@@ -7,7 +7,6 @@
  */
 
 #include "ICM-42688P.h"
-#include "ICM42688P_Config.h"
 #include <stdint.h>
 
 /**

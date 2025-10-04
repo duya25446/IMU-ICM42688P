@@ -15,7 +15,8 @@ extern "C" {
 
 /* Includes ------------------------------------------------------------------*/
 #include <stdint.h>
-
+#include "ICM42688P_Config.h"
+#include "ICM-42688P.h"
 /* Exported types ------------------------------------------------------------*/
 
 /* Exported constants --------------------------------------------------------*/
@@ -24,6 +25,7 @@ extern "C" {
 
 /* Exported functions prototypes ---------------------------------------------*/
 uint8_t IMU_Init(void);
+void IMU_GenerateFactoryConfig(ICM42688P_Config *config);
 #ifdef __cplusplus
 }
 #endif
