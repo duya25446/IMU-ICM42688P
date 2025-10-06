@@ -7,33 +7,19 @@
  */
 
 #include "ICM-42688P.h"
-#include "stm32g4xx_ll_spi.h"
 #include <stdint.h>
 
+// 外部SPI句柄声明
+extern SPI_HandleTypeDef hspi1;
+
 /**
- * @brief 通过SPI发送数据（使用LL库，高效实现）
+ * @brief 通过SPI发送数据（使用HAL库）
  * @param bytes 要发送的数据缓冲区
  * @param length 数据长度
  */
 void spi_send_bytes(uint8_t *bytes, uint8_t length)
 {
-    for (uint8_t i = 0; i < length; i++)
-    {
-        // 等待发送缓冲区空
-        while (!LL_SPI_IsActiveFlag_TXE(SPI1));
-        
-        // 发送数据
-        LL_SPI_TransmitData8(SPI1, bytes[i]);
-        
-        // 等待接收完成（全双工模式需要读取接收的数据）
-        while (!LL_SPI_IsActiveFlag_RXNE(SPI1));
-        
-        // 读取并丢弃接收到的数据
-        LL_SPI_ReceiveData8(SPI1);
-    }
-    
-    // 等待总线空闲
-    while (LL_SPI_IsActiveFlag_BSY(SPI1));
+    HAL_SPI_Transmit(&hspi1, bytes, length, HAL_MAX_DELAY);
 }
 
 /**
@@ -46,98 +32,41 @@ void delay_ms(uint32_t ms)
 }
 
 /**
- * @brief 通过SPI接收数据（使用LL库，高效实现）
+ * @brief 通过SPI接收数据（使用HAL库）
  * @param bytes 接收数据缓冲区
  * @param length 数据长度
  */
 void spi_read_bytes(uint8_t *bytes, uint8_t length)
 {
-    for (uint8_t i = 0; i < length; i++)
-    {
-        // 等待发送缓冲区空
-        while (!LL_SPI_IsActiveFlag_TXE(SPI1));
-        
-        // 发送哑数据以产生时钟信号
-        LL_SPI_TransmitData8(SPI1, 0xFF);
-        
-        // 等待接收完成
-        while (!LL_SPI_IsActiveFlag_RXNE(SPI1));
-        
-        // 读取接收到的数据
-        bytes[i] = LL_SPI_ReceiveData8(SPI1);
-    }
-    
-    // 等待总线空闲
-    while (LL_SPI_IsActiveFlag_BSY(SPI1));
+    HAL_SPI_Receive(&hspi1, bytes, length, HAL_MAX_DELAY);
 }
 
 /**
- * @brief 突发读取寄存器（底层硬件实现 - 极致优化版）
+ * @brief 突发读取寄存器（底层硬件实现 - HAL库版本）
  * @param reg_address 寄存器地址
  * @param rxdata 接收数据缓冲区
  * @param length 数据长度
- * 
- * @note 极致性能优化，通过以下技术将速度提升至极限：
- *       1. **直接寄存器访问**：跳过LL库函数调用，减少约40%开销
- *       2. **消除冗余等待**：充分利用SPI全双工特性，读RX后TX自动空
- *       3. **编译器优化提示**：使用__STATIC_FORCEINLINE强制内联
- *       4. **流水线并行**：发送和接收完全重叠，无空闲周期
- *       5. **最小化分支**：减少条件判断开销
- * 
- * @performance 实测性能（STM32G4 @170MHz，SPI @32MHz）：
- *              - 12字节读取：约6-8us（相比LL库版本提升50-60%）
- *              - 满足32kHz ODR要求（周期31us，留有充足余量）
- * 
+ *
+ * @note 使用HAL库进行SPI通信，提供稳定可靠的寄存器读取功能
+ *
  * @warning 此函数为内部实现，不处理Bank选择等上层逻辑
  */
-__STATIC_FORCEINLINE void ICM42688P_BurstRead_Internal(uint8_t reg_address, uint8_t *rxdata, uint8_t length)
+void ICM42688P_BurstRead_Internal(uint8_t reg_address, uint8_t *rxdata, uint8_t length)
 {
-    // 直接访问SPI寄存器（避免LL库函数调用开销）
-    volatile uint32_t *spi_dr = (uint32_t *)&(SPI1->DR);
-    volatile uint32_t *spi_sr = (uint32_t *)&(SPI1->SR);
-    
-    // SPI状态寄存器位定义
-    #define _SPI_SR_TXE   (1U << 1)   // 发送缓冲区空
-    #define _SPI_SR_RXNE  (1U << 0)   // 接收缓冲区非空
-    #define _SPI_SR_BSY   (1U << 7)   // 忙标志
+    uint8_t tx_addr = reg_address | ICM42688P_READ;
     
     cs_low();
     
     // 发送寄存器地址（带读标志）
-    while (!((*spi_sr) & _SPI_SR_TXE));
-    *spi_dr = reg_address | ICM42688P_READ;
-    while (!((*spi_sr) & _SPI_SR_RXNE));
-    (void)(*spi_dr);  // 丢弃地址字节的回应
+    HAL_SPI_Transmit(&hspi1, &tx_addr, 1, HAL_MAX_DELAY);
     
-    // 流水线批量读取
-    if (length > 0) {
-        // 发送第一个哑字节（添加安全检查确保TX缓冲区空）
-        while (!((*spi_sr) & _SPI_SR_TXE));
-        *spi_dr = 0xFF;
-        
-        // 流水线循环：读取当前字节的同时发送下一个
-        // 关键优化：读取DR后，TX自动清空，无需等待TXE
-        uint8_t i = 0;
-        while (i < length - 1) {
-            while (!((*spi_sr) & _SPI_SR_RXNE));
-            rxdata[i] = *spi_dr;
-            *spi_dr = 0xFF;  // 立即发送下一个（读取DR后TX已空）
-            i++;
-        }
-        
-        // 读取最后一个字节
-        while (!((*spi_sr) & _SPI_SR_RXNE));
-        rxdata[length - 1] = *spi_dr;
+    // 读取数据
+    if (length > 0)
+    {
+        HAL_SPI_Receive(&hspi1, rxdata, length, HAL_MAX_DELAY);
     }
     
-    // 等待传输完全结束（只检查一次）
-    while ((*spi_sr) & _SPI_SR_BSY);
-    
     cs_high();
-    
-    #undef _SPI_SR_TXE
-    #undef _SPI_SR_RXNE
-    #undef _SPI_SR_BSY
 }
 
 /**
@@ -307,30 +236,40 @@ void parse_imu_data_to_physical(int16_t *input, double *output)
 }
 
 /**
- * @brief 读取IMU数据
+ * @brief 读取IMU数据（包含温度）
  * @param data 指向IMU_Data结构体的指针，用于存储读取的数据
  *
- * 读取加速度计和陀螺仪的原始数据，进行解析和转换，
- * 并应用零偏校准和阈值滤波
+ * 从0x1D开始一次性读取14个字节：
+ * - 0x1D: 温度高字节
+ * - 0x1E: 温度低字节
+ * - 0x1F-0x2A: 加速度计和陀螺仪数据（12字节）
+ * 进行解析和转换，并应用零偏校准和阈值滤波
  */
 void ICM42688P_ReadIMUData(IMU_Data *data)
 {
-    uint8_t raw_data[12];
+    uint8_t raw_data[14]; // 2字节温度 + 12字节IMU数据
     int16_t int16_data[6];
     double physical_data[6];
 
-    //ICM42688P_Bank_Select(0);
-    ICM42688P_ReadRegister(0x1F, raw_data, 12);
-    parse_12bytes_to_6int16(raw_data, int16_data);
+    // 从0x1D开始一次性读取14个字节
+    // ICM42688P_Bank_Select(0);
+    ICM42688P_ReadRegister(0x1D, raw_data, 14);
+
+    // 解析温度数据（前2个字节）
+    // 温度寄存器：0x1D(高字节) 0x1E(低字节)
+    uint16_t temp_raw = (raw_data[0] << 8) | raw_data[1];
+    data->temperature = ((float)temp_raw / 132.48f) + 25.0f;
+
+    // 解析IMU数据（后12个字节）
+    parse_12bytes_to_6int16(raw_data + 2, int16_data);
     parse_imu_data_to_physical(int16_data, physical_data);
 
-    // 应用零偏校准
-    // data->accel_x = physical_data[0] + axzeroffset;
-    // data->accel_y = physical_data[1] + ayzeroffset;
-    // data->accel_z = physical_data[2] + azzeroffset;
-    // data->gyro_x = physical_data[3] + gxzeroffset;
-    // data->gyro_y = physical_data[4] + gyzeroffset;
-    // data->gyro_z = physical_data[5] + gzzeroffset;
+    data->accel_x = physical_data[0];
+    data->accel_y = physical_data[1];
+    data->accel_z = physical_data[2];
+    data->gyro_x = physical_data[3];
+    data->gyro_y = physical_data[4];
+    data->gyro_z = physical_data[5];
 
     // 陀螺仪阈值滤波
     // float epsilon = FLT_EPSILON;
@@ -352,44 +291,21 @@ void ICM42688P_ReadIMUData(IMU_Data *data)
     // }
 }
 
-
-
-/**
- * @brief 获取温度数据
- * @return 温度值（摄氏度）
- *
- * 读取温度传感器数据并转换为摄氏度
- */
-float ICM42688P_GetTemperature(void)
-{
-    float temperature = 0;
-    uint8_t buffer[2];
-    uint16_t temp_raw;
-
-    ICM42688P_Bank_Select(0);
-    ICM42688P_ReadRegister(0x1d, buffer + 1, 1);
-    ICM42688P_ReadRegister(0x1e, buffer, 1);
-    temp_raw = *(uint16_t *)buffer;
-    temperature = (((temp_raw) / 132.48)) + 25;
-
-    return temperature;
-}
-
 /**
  * @brief 读取寄存器（对外API接口）
  * @param reg_address 寄存器地址
  * @param rxdata 接收数据缓冲区
  * @param length 数据长度
- * 
+ *
  * @note 这是对外的API接口函数，适用于以下场景：
  *       - 单字节寄存器读取（如读取WHO_AM_I）
  *       - 连续多字节寄存器读取（如读取12字节IMU数据）
  *       - 不需要频繁切换Bank的批量读取
- * 
+ *
  * @example 读取单个寄存器：
  *          uint8_t whoami;
  *          ICM42688P_ReadRegister(ICM42688P_WHOAMI, &whoami, 1);
- * 
+ *
  * @example 批量读取IMU数据（加速度+陀螺仪）：
  *          uint8_t imu_data[12];
  *          ICM42688P_ReadRegister(0x1F, imu_data, 12);

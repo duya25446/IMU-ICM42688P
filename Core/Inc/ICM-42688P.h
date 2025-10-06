@@ -81,23 +81,26 @@ extern "C" {
 typedef struct
 {
     /** 加速度计数据，单位为g（重力加速度） */
-    double accel_x; // X轴加速度
-    double accel_y; // Y轴加速度
-    double accel_z; // Z轴加速度
+    float accel_x; // X轴加速度
+    float accel_y; // Y轴加速度
+    float accel_z; // Z轴加速度
 
     /** 陀螺仪数据，单位为度每秒（dps） */
-    double gyro_x; // X轴角速度
-    double gyro_y; // Y轴角速度
-    double gyro_z; // Z轴角速度
+    float gyro_x; // X轴角速度
+    float gyro_y; // Y轴角速度
+    float gyro_z; // Z轴角速度
 
     /** 四元数，用于表示设备的旋转状态 */
-    double q0; // q0（四元数实部）
-    double q1; // q1
-    double q2; // q2
-    double q3; // q3
+    float q0; // q0（四元数实部）
+    float q1; // q1
+    float q2; // q2
+    float q3; // q3
+    
+    /** 温度数据，单位为摄氏度 */
+    float temperature;
 
     /** 时间戳，用于记录系统时间或某个标准时间的数据 */
-    uint64_t timestamp;
+    uint16_t timestamp;
 
 } IMU_Data;
 
@@ -129,12 +132,6 @@ void ICM42688P_ODR_Config(void);
 void ICM42688P_Interrupt_Config(void);
 
 /**
- * @brief 获取温度数据
- * @return 温度值（摄氏度）
- */
-float ICM42688P_GetTemperature(void);
-
-/**
  * @brief 配置时钟
  */
 void ICM42688P_Clock_Config(void);
@@ -145,8 +142,10 @@ void ICM42688P_Clock_Config(void);
 void ICM42688P_Software_Reset(void);
 
 /**
- * @brief 读取IMU数据
+ * @brief 读取IMU数据（包含温度）
  * @param data 指向IMU_Data结构体的指针，用于存储读取的数据
+ * 
+ * 从0x1D开始一次性读取温度和IMU数据，提高效率
  */
 void ICM42688P_ReadIMUData(IMU_Data *data);
 

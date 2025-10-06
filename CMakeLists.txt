@@ -46,6 +46,7 @@ target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     Core/Src/ICM-426688P.c
     Core/Src/ICM42688P_Config.c
+    Core/Src/IMU.c
     # Core/Src/ICM42688P_Test.c  # 测试程序（需要时取消注释，存档: doc/tests/）
     # Add user sources here
 )

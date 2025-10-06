@@ -10,22 +10,27 @@
 #define IMU_H
 
 #ifdef __cplusplus
-extern "C" {
+extern "C"
+{
 #endif
 
 /* Includes ------------------------------------------------------------------*/
+
 #include <stdint.h>
 #include "ICM42688P_Config.h"
 #include "ICM-42688P.h"
-/* Exported types ------------------------------------------------------------*/
 
-/* Exported constants --------------------------------------------------------*/
+    /* Exported types ------------------------------------------------------------*/
 
-/* Exported macro ------------------------------------------------------------*/
+    /* Exported constants --------------------------------------------------------*/
 
-/* Exported functions prototypes ---------------------------------------------*/
-uint8_t IMU_Init(void);
-void IMU_GenerateFactoryConfig(ICM42688P_Config *config);
+    /* Exported macro ------------------------------------------------------------*/
+
+    /* Exported functions prototypes ---------------------------------------------*/
+    uint8_t IMU_Init(void);
+    void IMU_GenerateFactoryConfig(ICM42688P_Config *config);
+    uint8_t IMU_InterruptHandle(IMU_Data *data);
+
 #ifdef __cplusplus
 }
 #endif

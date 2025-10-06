@@ -23,6 +23,7 @@
 /* USER CODE BEGIN Includes */
 #include "ICM-42688P.h"
 #include "ICM42688P_Config.h"
+#include "IMU.h"
 // #include "ICM42688P_Test.h"  // 测试程序（需要时取消注释）
 #include "stm32g4xx_hal_uart.h"
 #include <stdint.h>
@@ -47,6 +48,7 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+SPI_HandleTypeDef hspi1;
 
 TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim3;
@@ -76,12 +78,13 @@ static void MX_TIM3_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 unsigned char timertag = 0;
-unsigned char txbuffer[100], rxhandledata[100];
+unsigned char txbuffer[200], rxhandledata[100];
 uint64_t timestamp = 0, previousTimestamp = 0;
 IMU_Data imudata;
+uint16_t timer_count = 0;
 // 测试用配置结构体（需要运行测试时取消注释）
-// ICM42688P_Config ReadAllConfig;
-// ICM42688P_Config TestConfig;
+ICM42688P_Config ReadAllConfig;
+ICM42688P_Config TestConfig;
 
 void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 {
@@ -110,11 +113,11 @@ int main(void)
     // uint8_t databuffer = 5;
     // uint8_t cont = 0;
     // float valx = 0.0f, valy = 0.0f, valz = 0.0f;
-    uint16_t timer_count = 0;
-    uint8_t rx[12];
+    // uint16_t timer_count = 0;
+    // uint8_t rx[12];
     // 测试用变量（需要运行测试时取消注释）
-    // uint8_t regbuffer[4096];
-    // uint16_t size = 0;
+    uint8_t regbuffer[4096];
+    uint16_t size = 0;
 
   /* USER CODE END 1 */
 
@@ -144,8 +147,10 @@ int main(void)
   MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
     cs_high();
+    HAL_NVIC_DisableIRQ(EXTI0_IRQn);
     HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
     __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, 2594);
+    HAL_TIM_Base_Start(&htim3);
 
     HAL_UARTEx_ReceiveToIdle_DMA(&huart1, rxhandledata, 40);
     __HAL_DMA_DISABLE_IT(&hdma_usart1_rx, DMA_IT_HT);
@@ -154,13 +159,13 @@ int main(void)
 
     // ICM42688P_Init();
     // HAL_Delay(10);
-    if (ICM42688P_Init() == 0)
+    if (IMU_Init() == 0)
     {
-        HAL_UART_Transmit(&huart2, (const unsigned char *)"ICM42688P Init Success\n", 31, 0xff);
+        HAL_UART_Transmit(&huart2, (const unsigned char *)"ICM42688P Init Success\n", strlen("ICM42688P Init Success\n"), 0xff);
     }
     else
     {
-        HAL_UART_Transmit(&huart2, (const unsigned char *)"ICM42688P Init Failed\n", 31, 0xff);
+        HAL_UART_Transmit(&huart2, (const unsigned char *)"ICM42688P Init Failed\n", strlen("ICM42688P Init Failed\n"), 0xff);
     }
 
     // ========================================================================
@@ -176,31 +181,69 @@ int main(void)
     // ICM42688P_RunAllTests();
     //
     // // 可选：打印最终配置状态
-    // ICM42688P_ReadAllConfigRegisters(&ReadAllConfig);
-    // size = ICM42688P_FormatRegisters(&ReadAllConfig, (char *)regbuffer, 4096);
-    // HAL_UART_Transmit(&huart2, (const unsigned char *)"\r\n=== 最终配置状态 ===\r\n",
-    //                   strlen("\r\n=== 最终配置状态 ===\r\n"), 1000);
-    // HAL_UART_Transmit(&huart2, (const unsigned char *)regbuffer, size, 1000);
+    ICM42688P_ReadAllConfigRegisters(&ReadAllConfig);
+    size = ICM42688P_FormatRegisters(&ReadAllConfig, (char *)regbuffer, 4096);
+    HAL_UART_Transmit(&huart2, (const unsigned char *)"\r\n=== 最终配置状态 ===\r\n",
+                      strlen("\r\n=== 最终配置状态 ===\r\n"), 1000);
+    HAL_UART_Transmit(&huart2, (const unsigned char *)regbuffer, size, 1000);
+
+    HAL_NVIC_EnableIRQ(EXTI0_IRQn);
     // ========================================================================
 
     // ICM42688P_ReadIMUData(&imudata);
 
     // HAL_TIM_Base_Start_IT(&htim3);
-    HAL_TIM_Base_Start(&htim3);
-    ICM42688P_Bank_Select(0);
-    timer_count = __HAL_TIM_GET_COUNTER(&htim3);
-    //ICM42688P_Software_Reset();
-    //ICM42688P_ReadIMUData(&imudata);
-    ICM42688P_ReadRegister(0x1F, rx, 20);
-    timer_count = __HAL_TIM_GET_COUNTER(&htim3) - timer_count;
-    sprintf((char *)txbuffer, "Software Reset Time:%d us\n", timer_count);
-    HAL_UART_Transmit(&huart2, (const unsigned char *)txbuffer, strlen((const char *)txbuffer), 0xff);
+    
+    // ICM42688P_Bank_Select(0);
+    // timer_count = __HAL_TIM_GET_COUNTER(&htim3);
+    // //ICM42688P_Software_Reset();
+    // //ICM42688P_ReadIMUData(&imudata);
+    // ICM42688P_ReadRegister(0x1F, rx, 20);
+    // timer_count = __HAL_TIM_GET_COUNTER(&htim3) - timer_count;
+    // sprintf((char *)txbuffer, "Software Reset Time:%d us\n", timer_count);
+    // HAL_UART_Transmit(&huart2, (const unsigned char *)txbuffer, strlen((const char *)txbuffer), 0xff);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
     while (1)
     {
+        if (timertag == 1) {
+          // 格式化 IMU 数据为 FireWater 协议格式
+          // 格式: "IMU:ax,ay,az,gx,gy,gz,q0,q1,q2,q3,temp,timestamp\n"
+          int len = sprintf((char *)txbuffer, 
+                           "IMU:%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.2f,%d\n",
+                           imudata.accel_x,    // 加速度 X
+                           imudata.accel_y,    // 加速度 Y
+                           imudata.accel_z,    // 加速度 Z
+                           imudata.gyro_x,     // 陀螺仪 X
+                           imudata.gyro_y,     // 陀螺仪 Y
+                           imudata.gyro_z,     // 陀螺仪 Z
+                           imudata.temperature,// 温度
+                           imudata.timestamp); // 时间戳
+          
+          // 同时通过 UART1 和 UART2 发送数据
+          HAL_UART_Transmit(&huart1, txbuffer, len, 0xff);
+          HAL_UART_Transmit(&huart2, txbuffer, len, 0xff);
+
+          // uint16_t current_tim3_count = __HAL_TIM_GET_COUNTER(&htim3);
+    
+          // // 计算时间差（μs），处理16位计数器溢出
+          // // 8kHz ODR理论间隔=125μs，不会在正常情况下溢出
+          // uint16_t time_delta;
+          // if (current_tim3_count >= timer_count) {
+          //     // 正常情况：当前计数值大于上次计数值
+          //     time_delta = current_tim3_count - timer_count;
+          // } else {
+          //     // 溢出情况：计数器从65535回绕到0
+          //     time_delta = (65536 - timer_count) + current_tim3_count;
+          // }
+          // timer_count = current_tim3_count;
+          // sprintf((char *)txbuffer, "TimeDelta:%d\n", time_delta);
+          // HAL_UART_Transmit(&huart2, (const unsigned char *)txbuffer, strlen((const char *)txbuffer), 0xff);
+          timertag = 0;
+        }
+
         // sprintf((char *)txbuffer, "Temperature:%f\n",
         // ICM42688P_GetTemperature()); HAL_UART_Transmit(&huart2, (const unsigned
         // char *)txbuffer,
@@ -298,64 +341,31 @@ static void MX_SPI1_Init(void)
 
   /* USER CODE END SPI1_Init 0 */
 
-  LL_SPI_InitTypeDef SPI_InitStruct = {0};
-
-  LL_GPIO_InitTypeDef GPIO_InitStruct = {0};
-
-  /* Peripheral clock enable */
-  LL_APB2_GRP1_EnableClock(LL_APB2_GRP1_PERIPH_SPI1);
-
-  LL_AHB2_GRP1_EnableClock(LL_AHB2_GRP1_PERIPH_GPIOA);
-  /**SPI1 GPIO Configuration
-  PA5   ------> SPI1_SCK
-  PA6   ------> SPI1_MISO
-  PA7   ------> SPI1_MOSI
-  */
-  GPIO_InitStruct.Pin = LL_GPIO_PIN_5;
-  GPIO_InitStruct.Mode = LL_GPIO_MODE_ALTERNATE;
-  GPIO_InitStruct.Speed = LL_GPIO_SPEED_FREQ_LOW;
-  GPIO_InitStruct.OutputType = LL_GPIO_OUTPUT_PUSHPULL;
-  GPIO_InitStruct.Pull = LL_GPIO_PULL_NO;
-  GPIO_InitStruct.Alternate = LL_GPIO_AF_5;
-  LL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-
-  GPIO_InitStruct.Pin = LL_GPIO_PIN_6;
-  GPIO_InitStruct.Mode = LL_GPIO_MODE_ALTERNATE;
-  GPIO_InitStruct.Speed = LL_GPIO_SPEED_FREQ_LOW;
-  GPIO_InitStruct.OutputType = LL_GPIO_OUTPUT_PUSHPULL;
-  GPIO_InitStruct.Pull = LL_GPIO_PULL_NO;
-  GPIO_InitStruct.Alternate = LL_GPIO_AF_5;
-  LL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-
-  GPIO_InitStruct.Pin = LL_GPIO_PIN_7;
-  GPIO_InitStruct.Mode = LL_GPIO_MODE_ALTERNATE;
-  GPIO_InitStruct.Speed = LL_GPIO_SPEED_FREQ_LOW;
-  GPIO_InitStruct.OutputType = LL_GPIO_OUTPUT_PUSHPULL;
-  GPIO_InitStruct.Pull = LL_GPIO_PULL_NO;
-  GPIO_InitStruct.Alternate = LL_GPIO_AF_5;
-  LL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-
   /* USER CODE BEGIN SPI1_Init 1 */
 
   /* USER CODE END SPI1_Init 1 */
   /* SPI1 parameter configuration*/
-  SPI_InitStruct.TransferDirection = LL_SPI_FULL_DUPLEX;
-  SPI_InitStruct.Mode = LL_SPI_MODE_MASTER;
-  SPI_InitStruct.DataWidth = LL_SPI_DATAWIDTH_8BIT;
-  SPI_InitStruct.ClockPolarity = LL_SPI_POLARITY_LOW;
-  SPI_InitStruct.ClockPhase = LL_SPI_PHASE_1EDGE;
-  SPI_InitStruct.NSS = LL_SPI_NSS_SOFT;
-  SPI_InitStruct.BaudRate = LL_SPI_BAUDRATEPRESCALER_DIV8;
-  SPI_InitStruct.BitOrder = LL_SPI_MSB_FIRST;
-  SPI_InitStruct.CRCCalculation = LL_SPI_CRCCALCULATION_DISABLE;
-  SPI_InitStruct.CRCPoly = 7;
-  LL_SPI_Init(SPI1, &SPI_InitStruct);
-  LL_SPI_SetStandard(SPI1, LL_SPI_PROTOCOL_MOTOROLA);
-  LL_SPI_EnableNSSPulseMgt(SPI1);
+  hspi1.Instance = SPI1;
+  hspi1.Init.Mode = SPI_MODE_MASTER;
+  hspi1.Init.Direction = SPI_DIRECTION_2LINES;
+  hspi1.Init.DataSize = SPI_DATASIZE_8BIT;
+  hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
+  hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
+  hspi1.Init.NSS = SPI_NSS_SOFT;
+  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_8;
+  hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
+  hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
+  hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
+  hspi1.Init.CRCPolynomial = 7;
+  hspi1.Init.CRCLength = SPI_CRC_LENGTH_DATASIZE;
+  hspi1.Init.NSSPMode = SPI_NSS_PULSE_ENABLE;
+  if (HAL_SPI_Init(&hspi1) != HAL_OK)
+  {
+    Error_Handler();
+  }
   /* USER CODE BEGIN SPI1_Init 2 */
   
   // 启用SPI外设（LL库需要手动启用）
-  LL_SPI_Enable(SPI1);
   
   /* USER CODE END SPI1_Init 2 */
 
@@ -431,7 +441,7 @@ static void MX_TIM3_Init(void)
   htim3.Instance = TIM3;
   htim3.Init.Prescaler = 170-1;
   htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim3.Init.Period = 999;
+  htim3.Init.Period = 65535;
   htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim3) != HAL_OK)
@@ -600,9 +610,13 @@ static void MX_GPIO_Init(void)
 
   /*Configure GPIO pin : PB0 */
   GPIO_InitStruct.Pin = GPIO_PIN_0;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI0_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI0_IRQn);
 
   /* USER CODE BEGIN MX_GPIO_Init_2 */
   /* USER CODE END MX_GPIO_Init_2 */

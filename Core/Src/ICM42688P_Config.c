@@ -883,11 +883,27 @@ uint8_t ICM42688P_ApplyConfig(const ICM42688P_Config *config)
         return 1;
     }
 
-    // 使用映射表写入所有Bank的寄存器（优化后的实现，避免代码重复）
-    // Bank 0配置
+    // ============================================================================
+    // 关键修改：按照数据手册12.9要求的顺序配置
+    // 1. 先关闭传感器（如果已启动）
+    // 2. 配置所有其他寄存器
+    // 3. 最后启动传感器
+    // ============================================================================
+
+    // Step 1: 切换到 Bank 0 并关闭传感器
     ICM42688P_Bank_Select(0);
+    uint8_t pwr_mgmt_off = 0x00;  // 关闭 Gyro 和 Accel
+    error |= ICM42688P_WriteRegister(0x4E, &pwr_mgmt_off, 1);
+    delay_ms(1);  // 等待传感器关闭
+
+    // Step 2: 写入所有配置寄存器（跳过 PWR_MGMT0）
     const uint8_t *bank0_ptr = (const uint8_t *)&config->bank0;
     for (uint8_t i = 0; i < BANK0_REG_COUNT; i++) {
+        // 跳过 PWR_MGMT0，最后再配置
+        if (bank0_reg_map[i].reg_addr == 0x4E) {
+            continue;
+        }
+        
         error |= ICM42688P_WriteRegister(bank0_reg_map[i].reg_addr,
                                          (uint8_t *)&bank0_ptr[bank0_reg_map[i].offset_in_struct], 1);
         // 根据寄存器类型智能延时
@@ -934,8 +950,13 @@ uint8_t ICM42688P_ApplyConfig(const ICM42688P_Config *config)
         }
     }
 
-    // 切回Bank 0
+    // Step 3: 切回 Bank 0，最后写入电源管理配置
     ICM42688P_Bank_Select(0);
+    
+    // 写入 PWR_MGMT0 配置值（可能是启动或关闭，取决于配置）
+    // 数据手册14.36：从OFF到其他模式转换后，需等待200μs后再访问寄存器
+    error |= ICM42688P_WriteRegister(0x4E, (uint8_t *)&config->bank0.PWR_MGMT0, 1);
+    delay_ms(1);  // 等待电源状态转换稳定（>200μs）
 
     // Level 1: 全局应用成功后，更新内部配置存储
     if (!error) {
