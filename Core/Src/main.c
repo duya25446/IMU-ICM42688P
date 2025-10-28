@@ -48,6 +48,11 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+I2C_HandleTypeDef hi2c1;
+I2C_HandleTypeDef hi2c3;
+
+LPTIM_HandleTypeDef hlptim1;
+
 SPI_HandleTypeDef hspi1;
 
 TIM_HandleTypeDef htim2;
@@ -71,6 +76,9 @@ static void MX_TIM2_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_TIM3_Init(void);
+static void MX_I2C1_Init(void);
+static void MX_I2C3_Init(void);
+static void MX_LPTIM1_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -145,9 +153,14 @@ int main(void)
   MX_USART1_UART_Init();
   MX_USART2_UART_Init();
   MX_TIM3_Init();
+  MX_I2C1_Init();
+  MX_I2C3_Init();
+  MX_LPTIM1_Init();
   /* USER CODE BEGIN 2 */
     cs_high();
     HAL_NVIC_DisableIRQ(EXTI0_IRQn);
+    HAL_NVIC_DisableIRQ(EXTI9_5_IRQn);
+    IMU_Set_UART(&huart1);
     HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
     __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, 2594);
     HAL_TIM_Base_Start(&htim3);
@@ -161,11 +174,11 @@ int main(void)
     // HAL_Delay(10);
     if (IMU_Init() == 0)
     {
-        HAL_UART_Transmit(&huart2, (const unsigned char *)"ICM42688P Init Success\n", strlen("ICM42688P Init Success\n"), 0xff);
+        HAL_UART_Transmit(&huart1, (const unsigned char *)"ICM42688P Init Success\n", strlen("ICM42688P Init Success\n"), 0xff);
     }
     else
     {
-        HAL_UART_Transmit(&huart2, (const unsigned char *)"ICM42688P Init Failed\n", strlen("ICM42688P Init Failed\n"), 0xff);
+        HAL_UART_Transmit(&huart1, (const unsigned char *)"ICM42688P Init Failed\n", strlen("ICM42688P Init Failed\n"), 0xff);
     }
 
     // ========================================================================
@@ -181,13 +194,14 @@ int main(void)
     // ICM42688P_RunAllTests();
     //
     // // 可选：打印最终配置状态
-    ICM42688P_ReadAllConfigRegisters(&ReadAllConfig);
-    size = ICM42688P_FormatRegisters(&ReadAllConfig, (char *)regbuffer, 4096);
-    HAL_UART_Transmit(&huart2, (const unsigned char *)"\r\n=== 最终配置状态 ===\r\n",
-                      strlen("\r\n=== 最终配置状态 ===\r\n"), 1000);
-    HAL_UART_Transmit(&huart2, (const unsigned char *)regbuffer, size, 1000);
+    // ICM42688P_ReadAllConfigRegisters(&ReadAllConfig);
+    // size = ICM42688P_FormatRegisters(&ReadAllConfig, (char *)regbuffer, 4096);
+    // HAL_UART_Transmit(&huart1, (const unsigned char *)"\r\n=== 最终配置状态 ===\r\n",
+    //                   strlen("\r\n=== 最终配置状态 ===\r\n"), 1000);
+    // HAL_UART_Transmit(&huart1, (const unsigned char *)regbuffer, size, 1000);
 
     HAL_NVIC_EnableIRQ(EXTI0_IRQn);
+    HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
     // ========================================================================
 
     // ICM42688P_ReadIMUData(&imudata);
@@ -208,41 +222,54 @@ int main(void)
   /* USER CODE BEGIN WHILE */
     while (1)
     {
-        if (timertag == 1) {
-          // 格式化 IMU 数据为 FireWater 协议格式
-          // 格式: "IMU:ax,ay,az,gx,gy,gz,q0,q1,q2,q3,temp,timestamp\n"
-          int len = sprintf((char *)txbuffer, 
-                           "IMU:%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.2f,%d\n",
-                           imudata.accel_x,    // 加速度 X
-                           imudata.accel_y,    // 加速度 Y
-                           imudata.accel_z,    // 加速度 Z
-                           imudata.gyro_x,     // 陀螺仪 X
-                           imudata.gyro_y,     // 陀螺仪 Y
-                           imudata.gyro_z,     // 陀螺仪 Z
-                           imudata.temperature,// 温度
-                           imudata.timestamp); // 时间戳
-          
-          // 同时通过 UART1 和 UART2 发送数据
-          HAL_UART_Transmit(&huart1, txbuffer, len, 0xff);
-          HAL_UART_Transmit(&huart2, txbuffer, len, 0xff);
-
-          // uint16_t current_tim3_count = __HAL_TIM_GET_COUNTER(&htim3);
-    
-          // // 计算时间差（μs），处理16位计数器溢出
-          // // 8kHz ODR理论间隔=125μs，不会在正常情况下溢出
-          // uint16_t time_delta;
-          // if (current_tim3_count >= timer_count) {
-          //     // 正常情况：当前计数值大于上次计数值
-          //     time_delta = current_tim3_count - timer_count;
-          // } else {
-          //     // 溢出情况：计数器从65535回绕到0
-          //     time_delta = (65536 - timer_count) + current_tim3_count;
-          // }
-          // timer_count = current_tim3_count;
-          // sprintf((char *)txbuffer, "TimeDelta:%d\n", time_delta);
-          // HAL_UART_Transmit(&huart2, (const unsigned char *)txbuffer, strlen((const char *)txbuffer), 0xff);
-          timertag = 0;
-        }
+        // ========================================================================
+        // 统一的IMU+磁力计数据采集输出（中断驱动模式）
+        // ICM42688P中断：EXTI0_IRQHandler → IMU_InterruptHandle() [1kHz]
+        // BMM350中断：EXTI9_5_IRQHandler → IMU_MagInterruptHandle() [400Hz]
+        // ========================================================================
+        // if (timertag == 1) {
+        //     // ICM42688P数据就绪（1kHz），准备发送数据包
+            
+        //     // 检查是否有新的磁力计数据
+        //     if (imudata.mag_data_ready) {
+        //         // 有新的磁力计数据，清除标志
+        //         imudata.mag_data_ready = 0;
+        //     } else {
+        //         // 无新磁力计数据，将磁力计字段置0
+        //         imudata.mag_x = 0.0f;
+        //         imudata.mag_y = 0.0f;
+        //         imudata.mag_z = 0.0f;
+        //         imudata.mag_temperature = 0.0f;
+        //         imudata.mag_timestamp = 0;
+        //     }
+            
+        //     // 格式化IMU+磁力计数据输出
+        //     // 格式: "IMU:ax,ay,az,gx,gy,gz,temp,imu_ts,mx,my,mz,mag_temp,mag_ts\r\n"
+        //     int len = sprintf((char *)txbuffer, 
+        //                    "IMU:%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.2f,%u,%.2f,%.2f,%.2f,%.2f,%u\r\n",
+        //                    imudata.accel_x,        // 加速度 X (g)
+        //                    imudata.accel_y,        // 加速度 Y (g)
+        //                    imudata.accel_z,        // 加速度 Z (g)
+        //                    imudata.gyro_x,         // 陀螺仪 X (dps)
+        //                    imudata.gyro_y,         // 陀螺仪 Y (dps)
+        //                    imudata.gyro_z,         // 陀螺仪 Z (dps)
+        //                    imudata.temperature,    // IMU温度 (°C)
+        //                    imudata.timestamp,      // IMU时间戳 (μs)
+        //                    imudata.mag_x,          // 磁场 X (μT)
+        //                    imudata.mag_y,          // 磁场 Y (μT)
+        //                    imudata.mag_z,          // 磁场 Z (μT)
+        //                    imudata.mag_temperature,// 磁力计温度 (°C)
+        //                    imudata.mag_timestamp); // 磁力计时间戳 (μs)
+            
+        //     // 通过 UART1 发送数据
+        //     HAL_UART_Transmit(&huart1, txbuffer, len, 0xff);
+            
+        //     // 清除标志
+        //     timertag = 0;
+        // }
+        // ========================================================================
+        // HAL_UART_Transmit(&huart1, (const unsigned char *)"Hello, World!", 13, 0xff);
+        // HAL_Delay(100);
 
         // sprintf((char *)txbuffer, "Temperature:%f\n",
         // ICM42688P_GetTemperature()); HAL_UART_Transmit(&huart2, (const unsigned
@@ -327,6 +354,136 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
+}
+
+/**
+  * @brief I2C1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_I2C1_Init(void)
+{
+
+  /* USER CODE BEGIN I2C1_Init 0 */
+
+  /* USER CODE END I2C1_Init 0 */
+
+  /* USER CODE BEGIN I2C1_Init 1 */
+
+  /* USER CODE END I2C1_Init 1 */
+  hi2c1.Instance = I2C1;
+  hi2c1.Init.Timing = 0x40621236;
+  hi2c1.Init.OwnAddress1 = 0;
+  hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
+  hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
+  hi2c1.Init.OwnAddress2 = 0;
+  hi2c1.Init.OwnAddress2Masks = I2C_OA2_NOMASK;
+  hi2c1.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
+  hi2c1.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
+  if (HAL_I2C_Init(&hi2c1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Analogue filter
+  */
+  if (HAL_I2CEx_ConfigAnalogFilter(&hi2c1, I2C_ANALOGFILTER_ENABLE) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Digital filter
+  */
+  if (HAL_I2CEx_ConfigDigitalFilter(&hi2c1, 0) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN I2C1_Init 2 */
+
+  /* USER CODE END I2C1_Init 2 */
+
+}
+
+/**
+  * @brief I2C3 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_I2C3_Init(void)
+{
+
+  /* USER CODE BEGIN I2C3_Init 0 */
+
+  /* USER CODE END I2C3_Init 0 */
+
+  /* USER CODE BEGIN I2C3_Init 1 */
+
+  /* USER CODE END I2C3_Init 1 */
+  hi2c3.Instance = I2C3;
+  hi2c3.Init.Timing = 0x40621236;
+  hi2c3.Init.OwnAddress1 = 0;
+  hi2c3.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
+  hi2c3.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
+  hi2c3.Init.OwnAddress2 = 0;
+  hi2c3.Init.OwnAddress2Masks = I2C_OA2_NOMASK;
+  hi2c3.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
+  hi2c3.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
+  if (HAL_I2C_Init(&hi2c3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Analogue filter
+  */
+  if (HAL_I2CEx_ConfigAnalogFilter(&hi2c3, I2C_ANALOGFILTER_ENABLE) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Digital filter
+  */
+  if (HAL_I2CEx_ConfigDigitalFilter(&hi2c3, 0) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN I2C3_Init 2 */
+
+  /* USER CODE END I2C3_Init 2 */
+
+}
+
+/**
+  * @brief LPTIM1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_LPTIM1_Init(void)
+{
+
+  /* USER CODE BEGIN LPTIM1_Init 0 */
+
+  /* USER CODE END LPTIM1_Init 0 */
+
+  /* USER CODE BEGIN LPTIM1_Init 1 */
+
+  /* USER CODE END LPTIM1_Init 1 */
+  hlptim1.Instance = LPTIM1;
+  hlptim1.Init.Clock.Source = LPTIM_CLOCKSOURCE_APBCLOCK_LPOSC;
+  hlptim1.Init.Clock.Prescaler = LPTIM_PRESCALER_DIV1;
+  hlptim1.Init.Trigger.Source = LPTIM_TRIGSOURCE_SOFTWARE;
+  hlptim1.Init.OutputPolarity = LPTIM_OUTPUTPOLARITY_HIGH;
+  hlptim1.Init.UpdateMode = LPTIM_UPDATE_IMMEDIATE;
+  hlptim1.Init.CounterSource = LPTIM_COUNTERSOURCE_INTERNAL;
+  hlptim1.Init.Input1Source = LPTIM_INPUT1SOURCE_GPIO;
+  hlptim1.Init.Input2Source = LPTIM_INPUT2SOURCE_GPIO;
+  if (HAL_LPTIM_Init(&hlptim1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN LPTIM1_Init 2 */
+
+  /* USER CODE END LPTIM1_Init 2 */
+
 }
 
 /**
@@ -481,7 +638,7 @@ static void MX_USART1_UART_Init(void)
 
   /* USER CODE END USART1_Init 1 */
   huart1.Instance = USART1;
-  huart1.Init.BaudRate = 2000000;
+  huart1.Init.BaudRate = 6000000;
   huart1.Init.WordLength = UART_WORDLENGTH_8B;
   huart1.Init.StopBits = UART_STOPBITS_1;
   huart1.Init.Parity = UART_PARITY_NONE;
@@ -599,10 +756,10 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_4, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_4|EEPROM_WC_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pin : PC4 */
-  GPIO_InitStruct.Pin = GPIO_PIN_4;
+  /*Configure GPIO pins : PC4 EEPROM_WC_Pin */
+  GPIO_InitStruct.Pin = GPIO_PIN_4|EEPROM_WC_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
@@ -614,9 +771,18 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_PULLUP;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
+  /*Configure GPIO pin : PB9 */
+  GPIO_InitStruct.Pin = GPIO_PIN_9;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
   /* EXTI interrupt init*/
   HAL_NVIC_SetPriority(EXTI0_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(EXTI0_IRQn);
+
+  HAL_NVIC_SetPriority(EXTI9_5_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
 
   /* USER CODE BEGIN MX_GPIO_Init_2 */
   /* USER CODE END MX_GPIO_Init_2 */

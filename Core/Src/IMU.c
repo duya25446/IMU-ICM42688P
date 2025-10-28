@@ -2,10 +2,13 @@
  ******************************************************************************
  * @file    IMU.c
  * @brief   IMU传感器抽象层实现
+ * @note    集成ICM42688P（加速度计+陀螺仪）和BMM350（磁力计）
  ******************************************************************************
  */
 
 #include "IMU.h"
+#include "ICM-42688P.h"
+#include "BMM350/BMM350_Driver.h"
 #include "main.h"
 #include <string.h>
 #include <stddef.h>
@@ -23,11 +26,28 @@ ICM42688P_Config icm42688p_config;
 /* ============================================================================
  * Private Variables
  * ============================================================================ */
+// ICM42688P时间戳相关变量
 // 用于软件时间戳计算的上次TIM3计数值
 static uint16_t last_tim3_count = 0;
 
+// 绝对时间戳累积变量（单位：微秒），从IMU初始化开始累计
+static uint32_t absolute_timestamp_us = 0;
+
+// BMM350磁力计时间戳相关变量
+// 磁力计上次TIM3计数值
+static uint16_t last_mag_tim3_count = 0;
+
+// 磁力计绝对时间戳累积变量（单位：微秒），从初始化开始累计
+static uint32_t mag_absolute_timestamp_us = 0;
+
 // 外部定时器句柄声明
 extern TIM_HandleTypeDef htim3;
+
+// 外部UART句柄声明（用于初始化输出）
+extern UART_HandleTypeDef huart2;
+
+// IMU模块使用的UART句柄，默认使用huart2
+static UART_HandleTypeDef *imu_uart = &huart2;
 
 /* ============================================================================
  * Private Function Prototypes
@@ -116,20 +136,28 @@ uint8_t IMU_InterruptHandle(IMU_Data *data)
     // TIM3配置：Prescaler=169, Period=65535, 时钟=170MHz/170=1MHz
     // 计数精度：1μs，溢出周期：65.536ms
     uint16_t current_tim3_count = __HAL_TIM_GET_COUNTER(&htim3);
-    
+
     // 计算时间差（μs），处理16位计数器溢出
-    // 8kHz ODR理论间隔=125μs，不会在正常情况下溢出
+    // 1kHz ODR理论间隔=1000μs，8kHz ODR理论间隔=125μs
     uint16_t time_delta;
-    if (current_tim3_count >= last_tim3_count) {
+    if (current_tim3_count >= last_tim3_count)
+    {
         // 正常情况：当前计数值大于上次计数值
         time_delta = current_tim3_count - last_tim3_count;
-    } else {
+    }
+    else
+    {
         // 溢出情况：计数器从65535回绕到0
         time_delta = (65536 - last_tim3_count) + current_tim3_count;
     }
-    data->timestamp = time_delta;
+
+    // 累积到绝对时间戳（μs）
+    // uint32_t最大值：4,294,967,295μs ≈ 4295秒 ≈ 71.6分钟
+    // 溢出后会自动回绕，用户需要根据应用场景自行处理
+    absolute_timestamp_us += time_delta;
+    data->timestamp = absolute_timestamp_us;
     last_tim3_count = current_tim3_count;
-    
+
     // 读取并验证中断状态
     uint8_t interrupt_status;
     ICM42688P_ReadRegister(0x2D, &interrupt_status, 1);
@@ -137,7 +165,7 @@ uint8_t IMU_InterruptHandle(IMU_Data *data)
     {
         return 1;
     }
-    
+
     // 读取IMU数据（会自动清除中断）
     ICM42688P_ReadIMUData(data);
     return 0;
@@ -148,27 +176,237 @@ uint8_t IMU_InterruptHandle(IMU_Data *data)
  * ============================================================================ */
 
 /**
- * @brief 初始化IMU传感器
+ * @brief 配置IMU模块使用的UART句柄
+ * @param huart UART句柄指针
+ * @note 必须在IMU_Init()之前调用，否则使用默认的huart2
+ */
+void IMU_Set_UART(UART_HandleTypeDef *huart)
+{
+    if (huart != NULL) {
+        imu_uart = huart;
+    }
+}
+
+/**
+ * @brief 初始化IMU传感器（包括ICM42688P和BMM350）
  * @return 0=成功, 非0=失败
  */
 uint8_t IMU_Init(void)
 {
     uint8_t error = 0;
+    int8_t bmm_rslt = 0;
+    char buffer[200];
+
+    // ========================================================================
+    // 1. 初始化ICM42688P（加速度计+陀螺仪）
+    // ========================================================================
+    sprintf(buffer, "\r\n========================================\r\n");
+    HAL_UART_Transmit(imu_uart, (uint8_t *)buffer, strlen(buffer), 1000);
+
+    sprintf(buffer, "    ICM42688P IMU初始化\r\n");
+    HAL_UART_Transmit(imu_uart, (uint8_t *)buffer, strlen(buffer), 1000);
+
+    sprintf(buffer, "========================================\r\n");
+    HAL_UART_Transmit(imu_uart, (uint8_t *)buffer, strlen(buffer), 1000);
+
     if (ICM42688P_Init() != 0)
     {
+        sprintf(buffer, "[ICM42688P] ✗ 初始化失败\r\n");
+        HAL_UART_Transmit(imu_uart, (uint8_t *)buffer, strlen(buffer), 1000);
         return 1;
-    } // 检查IMU是否正常工作
-    // TODO:未来可以添加判断EEPROM是否存在过去配置，如果存在就用非出厂模式启动，如果不存在就使用出厂测试模式流程
+    }
+
+    sprintf(buffer, "[ICM42688P] ✓ 初始化成功\r\n");
+    HAL_UART_Transmit(imu_uart, (uint8_t *)buffer, strlen(buffer), 1000);
+
+    // 执行ICM42688P自检
+    sprintf(buffer, "\r\n---------- ICM42688P自检 ----------\r\n");
+    HAL_UART_Transmit(imu_uart, (uint8_t *)buffer, strlen(buffer), 1000);
+
+    ICM42688P_SelfTest_Result st_result;
+    if (ICM42688P_SelfTest(&st_result) == 0)
+    {
+        // 输出陀螺仪自检结果
+        sprintf(buffer, "[陀螺仪] X轴: %s (响应=%d, OTP=%d)\r\n",
+                st_result.gyro_x_pass ? "✓ 通过" : "✗ 失败",
+                st_result.gyro_st_response[0],
+                st_result.gyro_st_otp[0]);
+        HAL_UART_Transmit(imu_uart, (uint8_t *)buffer, strlen(buffer), 1000);
+
+        sprintf(buffer, "[陀螺仪] Y轴: %s (响应=%d, OTP=%d)\r\n",
+                st_result.gyro_y_pass ? "✓ 通过" : "✗ 失败",
+                st_result.gyro_st_response[1],
+                st_result.gyro_st_otp[1]);
+        HAL_UART_Transmit(imu_uart, (uint8_t *)buffer, strlen(buffer), 1000);
+
+        sprintf(buffer, "[陀螺仪] Z轴: %s (响应=%d, OTP=%d)\r\n",
+                st_result.gyro_z_pass ? "✓ 通过" : "✗ 失败",
+                st_result.gyro_st_response[2],
+                st_result.gyro_st_otp[2]);
+        HAL_UART_Transmit(imu_uart, (uint8_t *)buffer, strlen(buffer), 1000);
+
+        // 输出加速度计自检结果
+        sprintf(buffer, "[加速度计] X轴: %s (响应=%d, OTP=%d)\r\n",
+                st_result.accel_x_pass ? "✓ 通过" : "✗ 失败",
+                st_result.accel_st_response[0],
+                st_result.accel_st_otp[0]);
+        HAL_UART_Transmit(imu_uart, (uint8_t *)buffer, strlen(buffer), 1000);
+
+        sprintf(buffer, "[加速度计] Y轴: %s (响应=%d, OTP=%d)\r\n",
+                st_result.accel_y_pass ? "✓ 通过" : "✗ 失败",
+                st_result.accel_st_response[1],
+                st_result.accel_st_otp[1]);
+        HAL_UART_Transmit(imu_uart, (uint8_t *)buffer, strlen(buffer), 1000);
+
+        sprintf(buffer, "[加速度计] Z轴: %s (响应=%d, OTP=%d)\r\n",
+                st_result.accel_z_pass ? "✓ 通过" : "✗ 失败",
+                st_result.accel_st_response[2],
+                st_result.accel_st_otp[2]);
+        HAL_UART_Transmit(imu_uart, (uint8_t *)buffer, strlen(buffer), 1000);
+
+        // 输出整体自检结果
+        sprintf(buffer, "\r\n[ICM42688P] 整体自检: %s\r\n",
+                st_result.overall_pass ? "✓ 通过" : "✗ 失败");
+        HAL_UART_Transmit(imu_uart, (uint8_t *)buffer, strlen(buffer), 1000);
+
+        if (!st_result.overall_pass)
+        {
+            error += 1;
+        }
+    }
+    else
+    {
+        sprintf(buffer, "[ICM42688P] ✗ 自检执行失败\r\n");
+        HAL_UART_Transmit(imu_uart, (uint8_t *)buffer, strlen(buffer), 1000);
+        error += 1;
+    }
+
+    sprintf(buffer, "========================================\r\n\r\n");
+    HAL_UART_Transmit(imu_uart, (uint8_t *)buffer, strlen(buffer), 1000);
+
     // 加载默认配置
     ICM42688P_LoadDefaultConfig(&icm42688p_config);
     error += ICM42688P_ReadGyroFactoryCalibration(&icm42688p_config);
     ICM42688P_MigrateDefaultConfig(&icm42688p_config);
     error += ICM42688P_ApplyConfig(&icm42688p_config);
-    
-    // 初始化软件时间戳基准
+
+    // 初始化ICM42688P时间戳系统
+    absolute_timestamp_us = 0;
     last_tim3_count = __HAL_TIM_GET_COUNTER(&htim3);
-    
+
+    // ========================================================================
+    // 2. 初始化BMM350（磁力计）
+    // ========================================================================
+    sprintf(buffer, "\r\n========================================\r\n");
+    HAL_UART_Transmit(imu_uart, (uint8_t *)buffer, strlen(buffer), 1000);
+
+    sprintf(buffer, "    BMM350磁力计初始化\r\n");
+    HAL_UART_Transmit(imu_uart, (uint8_t *)buffer, strlen(buffer), 1000);
+
+    sprintf(buffer, "========================================\r\n");
+    HAL_UART_Transmit(imu_uart, (uint8_t *)buffer, strlen(buffer), 1000);
+    BMM350_Set_Debug_UART(imu_uart);
+    // 初始化BMM350
+    bmm_rslt = BMM350_Init();
+
+    if (bmm_rslt == BMM350_OK)
+    {
+        sprintf(buffer, "[BMM350] ✓ 初始化成功\r\n");
+        HAL_UART_Transmit(imu_uart, (uint8_t *)buffer, strlen(buffer), 1000);
+    }
+    else
+    {
+        sprintf(buffer, "[BMM350] ✗ 初始化失败，错误码: %d\r\n", bmm_rslt);
+        HAL_UART_Transmit(imu_uart, (uint8_t *)buffer, strlen(buffer), 1000);
+        error += 1;
+    }
+
+    // 等待传感器稳定
+    HAL_Delay(100);
+
+    // 执行出厂校准
+    bmm_rslt = BMM350_Factory_Calibration();
+
+    if (bmm_rslt == BMM350_OK)
+    {
+        sprintf(buffer, "[BMM350] ✓ 出厂校准成功\r\n");
+        HAL_UART_Transmit(imu_uart, (uint8_t *)buffer, strlen(buffer), 1000);
+    }
+    else
+    {
+        sprintf(buffer, "[BMM350] ✗ 出厂校准失败，错误码: %d\r\n", bmm_rslt);
+        HAL_UART_Transmit(imu_uart, (uint8_t *)buffer, strlen(buffer), 1000);
+    }
+
+    sprintf(buffer, "\r\n========================================\r\n");
+    HAL_UART_Transmit(imu_uart, (uint8_t *)buffer, strlen(buffer), 1000);
+
+    sprintf(buffer, "    开始采集IMU+磁力计数据\r\n");
+    HAL_UART_Transmit(imu_uart, (uint8_t *)buffer, strlen(buffer), 1000);
+
+    sprintf(buffer, "    ICM42688P: 1kHz | BMM350: 100Hz\r\n");
+    HAL_UART_Transmit(imu_uart, (uint8_t *)buffer, strlen(buffer), 1000);
+
+    sprintf(buffer, "========================================\r\n");
+    HAL_UART_Transmit(imu_uart, (uint8_t *)buffer, strlen(buffer), 1000);
+
+    // 初始化BMM350时间戳系统
+    mag_absolute_timestamp_us = 0;
+    last_mag_tim3_count = __HAL_TIM_GET_COUNTER(&htim3);
+
     return error;
+}
+
+/**
+ * @brief BMM350磁力计中断处理函数
+ * @param data IMU数据结构体指针
+ * @return 0=成功, 非0=失败
+ */
+uint8_t IMU_MagInterruptHandle(IMU_Data *data)
+{
+    // 立即读取TIM3计数器，获取最准确的时间戳
+    // TIM3配置：Prescaler=169, Period=65535, 时钟=170MHz/170=1MHz
+    // 计数精度：1μs，溢出周期：65.536ms
+    uint16_t current_tim3_count = __HAL_TIM_GET_COUNTER(&htim3);
+
+    // 计算时间差（μs），处理16位计数器溢出
+    // 400Hz ODR理论间隔=2500μs
+    uint16_t time_delta;
+    if (current_tim3_count >= last_mag_tim3_count)
+    {
+        // 正常情况：当前计数值大于上次计数值
+        time_delta = current_tim3_count - last_mag_tim3_count;
+    }
+    else
+    {
+        // 溢出情况：计数器从65535回绕到0
+        time_delta = (65536 - last_mag_tim3_count) + current_tim3_count;
+    }
+
+    // 累积到磁力计绝对时间戳（μs）
+    mag_absolute_timestamp_us += time_delta;
+    last_mag_tim3_count = current_tim3_count;
+
+    // 读取补偿后的磁场数据
+    struct bmm350_mag_temp_data mag_data;
+    int8_t rslt = BMM350_Get_Compensated_Data(&mag_data);
+
+    if (rslt == BMM350_OK)
+    {
+        // 填充磁力计数据到IMU_Data结构体
+        data->mag_x = mag_data.x;
+        data->mag_y = mag_data.y;
+        data->mag_z = mag_data.z;
+        data->mag_temperature = mag_data.temperature;
+        data->mag_timestamp = mag_absolute_timestamp_us;
+
+        // 设置数据就绪标志
+        data->mag_data_ready = 1;
+
+        return 0;
+    }
+
+    return 1;
 }
 
 void IMU_GenerateFactoryConfig(ICM42688P_Config *config) {}

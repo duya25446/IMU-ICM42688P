@@ -48,6 +48,14 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     Core/Src/ICM42688P_Config.c
     Core/Src/IMU.c
     # Core/Src/ICM42688P_Test.c  # 测试程序（需要时取消注释，存档: doc/tests/）
+    
+    # BMM350磁力计驱动
+    Core/Src/BMM350/bmm350.c
+    Core/Src/BMM350/bmm350_oor.c
+    Core/Src/BMM350/BMM350_Platform.c
+    Core/Src/BMM350/BMM350_Driver.c
+    Core/Src/BMM350/BMM350_Debug.c
+    
     # Add user sources here
 )
 
@@ -55,6 +63,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user defined include paths
     Core/Inc
+    Core/Inc/BMM350
 )
 
 # Add project symbols (macros)

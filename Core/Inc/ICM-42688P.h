@@ -18,6 +18,7 @@ extern "C" {
 #include "main.h"  // 需要HAL_GPIO_WritePin等HAL库函数
 #include "math.h"  // 需要fabs等数学函数
 #include "float.h" // 需要FLT_EPSILON等浮点常量
+#include "IMU.h"   // 使用统一的IMU_Data结构体定义
 
 /* Exported constants --------------------------------------------------------*/
 
@@ -71,38 +72,45 @@ extern "C" {
  */
 #define ICM42688P_WHOAMI 0x75
 
+/**
+ * @brief 自检配置寄存器地址（Bank 0）
+ */
+#define ICM42688P_SELF_TEST_CONFIG  0x70
+
+/**
+ * @brief 陀螺仪自检数据寄存器地址（Bank 1）
+ */
+#define ICM42688P_XG_ST_DATA        0x5F
+#define ICM42688P_YG_ST_DATA        0x60
+#define ICM42688P_ZG_ST_DATA        0x61
+
+/**
+ * @brief 加速度计自检数据寄存器地址（Bank 2）
+ */
+#define ICM42688P_XA_ST_DATA        0x3B
+#define ICM42688P_YA_ST_DATA        0x3C
+#define ICM42688P_ZA_ST_DATA        0x3D
+
 /* Exported types ------------------------------------------------------------*/
 
 /**
- * @brief IMU数据结构体
- *
- * 包含加速度计、陀螺仪、四元数和时间戳数据
+ * @brief ICM42688P自检结果结构体
  */
-typedef struct
-{
-    /** 加速度计数据，单位为g（重力加速度） */
-    float accel_x; // X轴加速度
-    float accel_y; // Y轴加速度
-    float accel_z; // Z轴加速度
+typedef struct {
+    uint8_t gyro_x_pass;           // X轴陀螺仪自检是否通过
+    uint8_t gyro_y_pass;           // Y轴陀螺仪自检是否通过
+    uint8_t gyro_z_pass;           // Z轴陀螺仪自检是否通过
+    uint8_t accel_x_pass;          // X轴加速度计自检是否通过
+    uint8_t accel_y_pass;          // Y轴加速度计自检是否通过
+    uint8_t accel_z_pass;          // Z轴加速度计自检是否通过
+    int16_t gyro_st_response[3];   // 陀螺仪自检响应（X/Y/Z）
+    int16_t accel_st_response[3];  // 加速度计自检响应（X/Y/Z）
+    uint8_t gyro_st_otp[3];        // 陀螺仪出厂自检数据（X/Y/Z）
+    uint8_t accel_st_otp[3];       // 加速度计出厂自检数据（X/Y/Z）
+    uint8_t overall_pass;          // 整体自检是否通过
+} ICM42688P_SelfTest_Result;
 
-    /** 陀螺仪数据，单位为度每秒（dps） */
-    float gyro_x; // X轴角速度
-    float gyro_y; // Y轴角速度
-    float gyro_z; // Z轴角速度
-
-    /** 四元数，用于表示设备的旋转状态 */
-    float q0; // q0（四元数实部）
-    float q1; // q1
-    float q2; // q2
-    float q3; // q3
-    
-    /** 温度数据，单位为摄氏度 */
-    float temperature;
-
-    /** 时间戳，用于记录系统时间或某个标准时间的数据 */
-    uint16_t timestamp;
-
-} IMU_Data;
+/* IMU_Data结构体定义已移至IMU.h */
 
 /* Exported functions prototypes ---------------------------------------------*/
 
@@ -171,6 +179,22 @@ void ICM42688P_ReadRegister(uint8_t reg_address, uint8_t *rxdata, uint8_t length
  * @return 0表示成功，1表示失败
  */
 uint8_t ICM42688P_WriteRegister(uint8_t reg_address, uint8_t *txdata, uint8_t length);
+
+/**
+ * @brief 执行ICM42688P自检
+ * @param result 自检结果结构体指针
+ * @return 0表示成功，1表示失败
+ * 
+ * 自检流程：
+ * 1. 读取未使能自检时的传感器输出（基准数据）
+ * 2. 使能陀螺仪自检，读取自检输出
+ * 3. 计算陀螺仪自检响应 = 自检数据 - 基准数据
+ * 4. 使能加速度计自检，读取自检输出
+ * 5. 计算加速度计自检响应 = 自检数据 - 基准数据
+ * 6. 读取工厂出厂自检数据（Bank 1和Bank 2）
+ * 7. 比较自检响应与出厂数据，验证是否在±30%范围内
+ */
+uint8_t ICM42688P_SelfTest(ICM42688P_SelfTest_Result *result);
 
 #ifdef __cplusplus
 }

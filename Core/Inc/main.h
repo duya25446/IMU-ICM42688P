@@ -59,6 +59,8 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define EEPROM_WC_Pin GPIO_PIN_10
+#define EEPROM_WC_GPIO_Port GPIOC
 
 /* USER CODE BEGIN Private defines */
 

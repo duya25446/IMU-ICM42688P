@@ -347,3 +347,206 @@ uint8_t ICM42688P_WriteRegister(uint8_t reg_address, uint8_t *txdata, uint8_t le
     }
     return 0; // 写入成功
 }
+
+/**
+ * @brief 执行ICM42688P自检
+ * @param result 自检结果结构体指针
+ * @return 0表示成功，1表示失败
+ *
+ * 自检流程：
+ * 1. 读取未使能自检时的传感器输出（基准数据）
+ * 2. 使能陀螺仪自检，读取自检输出
+ * 3. 计算陀螺仪自检响应 = 自检数据 - 基准数据
+ * 4. 使能加速度计自检，读取自检输出
+ * 5. 计算加速度计自检响应 = 自检数据 - 基准数据
+ * 6. 读取工厂出厂自检数据（Bank 1和Bank 2）
+ * 7. 比较自检响应与出厂数据，验证是否在±30%范围内
+ */
+uint8_t ICM42688P_SelfTest(ICM42688P_SelfTest_Result *result)
+{
+    if (result == NULL)
+    {
+        return 1;
+    }
+
+    // 初始化结果结构体
+    result->gyro_x_pass = 0;
+    result->gyro_y_pass = 0;
+    result->gyro_z_pass = 0;
+    result->accel_x_pass = 0;
+    result->accel_y_pass = 0;
+    result->accel_z_pass = 0;
+    result->overall_pass = 0;
+
+    // 存储基准数据和自检数据
+    int16_t gyro_baseline[3] = {0};
+    int16_t accel_baseline[3] = {0};
+    int16_t gyro_st_data[3] = {0};
+    int16_t accel_st_data[3] = {0};
+    uint8_t raw_data[12];
+
+    // 切换到Bank 0
+    ICM42688P_Bank_Select(0);
+
+    // ========================================================================
+    // 步骤1: 读取基准数据（未使能自检）
+    // ========================================================================
+    // 等待传感器稳定
+    delay_ms(20);
+
+    // 读取陀螺仪和加速度计数据（从0x1F开始，连续读取12字节）
+    ICM42688P_ReadRegister(0x1F, raw_data, 12);
+
+    // 解析基准数据：加速度计XYZ（前6字节）+ 陀螺仪XYZ（后6字节）
+    accel_baseline[0] = (int16_t)((raw_data[0] << 8) | raw_data[1]);  // ACCEL_X
+    accel_baseline[1] = (int16_t)((raw_data[2] << 8) | raw_data[3]);  // ACCEL_Y
+    accel_baseline[2] = (int16_t)((raw_data[4] << 8) | raw_data[5]);  // ACCEL_Z
+    gyro_baseline[0] = (int16_t)((raw_data[6] << 8) | raw_data[7]);   // GYRO_X
+    gyro_baseline[1] = (int16_t)((raw_data[8] << 8) | raw_data[9]);   // GYRO_Y
+    gyro_baseline[2] = (int16_t)((raw_data[10] << 8) | raw_data[11]); // GYRO_Z
+
+    // ========================================================================
+    // 步骤2: 陀螺仪自检
+    // ========================================================================
+    // 使能陀螺仪自检 (EN_GX_ST=1, EN_GY_ST=1, EN_GZ_ST=1)
+    uint8_t st_config = 0x07; // bit[2:0] = 111
+    ICM42688P_WriteRegister(ICM42688P_SELF_TEST_CONFIG, &st_config, 1);
+
+    // 等待自检稳定（datasheet建议至少20ms）
+    delay_ms(20);
+
+    // 读取自检数据
+    ICM42688P_ReadRegister(0x1F, raw_data, 12);
+
+    // 解析陀螺仪自检数据
+    gyro_st_data[0] = (int16_t)((raw_data[6] << 8) | raw_data[7]);   // GYRO_X
+    gyro_st_data[1] = (int16_t)((raw_data[8] << 8) | raw_data[9]);   // GYRO_Y
+    gyro_st_data[2] = (int16_t)((raw_data[10] << 8) | raw_data[11]); // GYRO_Z
+
+    // 计算陀螺仪自检响应
+    result->gyro_st_response[0] = gyro_st_data[0] - gyro_baseline[0];
+    result->gyro_st_response[1] = gyro_st_data[1] - gyro_baseline[1];
+    result->gyro_st_response[2] = gyro_st_data[2] - gyro_baseline[2];
+
+    // 禁用陀螺仪自检
+    st_config = 0x00;
+    ICM42688P_WriteRegister(ICM42688P_SELF_TEST_CONFIG, &st_config, 1);
+    delay_ms(20);
+
+    // ========================================================================
+    // 步骤3: 加速度计自检
+    // ========================================================================
+    // 使能加速度计自检 (ACCEL_ST_POWER=1, EN_AX_ST=1, EN_AY_ST=1, EN_AZ_ST=1)
+    st_config = 0x78; // bit[6]=1, bit[5:3]=111
+    ICM42688P_WriteRegister(ICM42688P_SELF_TEST_CONFIG, &st_config, 1);
+
+    // 等待自检稳定
+    delay_ms(20);
+
+    // 读取自检数据
+    ICM42688P_ReadRegister(0x1F, raw_data, 12);
+
+    // 解析加速度计自检数据
+    accel_st_data[0] = (int16_t)((raw_data[0] << 8) | raw_data[1]); // ACCEL_X
+    accel_st_data[1] = (int16_t)((raw_data[2] << 8) | raw_data[3]); // ACCEL_Y
+    accel_st_data[2] = (int16_t)((raw_data[4] << 8) | raw_data[5]); // ACCEL_Z
+
+    // 计算加速度计自检响应
+    result->accel_st_response[0] = accel_st_data[0] - accel_baseline[0];
+    result->accel_st_response[1] = accel_st_data[1] - accel_baseline[1];
+    result->accel_st_response[2] = accel_st_data[2] - accel_baseline[2];
+
+    // 禁用加速度计自检
+    st_config = 0x00;
+    ICM42688P_WriteRegister(ICM42688P_SELF_TEST_CONFIG, &st_config, 1);
+
+    // ========================================================================
+    // 步骤4: 读取工厂出厂自检数据
+    // ========================================================================
+    // 读取陀螺仪出厂自检数据（Bank 1）
+    ICM42688P_Bank_Select(1);
+    ICM42688P_ReadRegister(ICM42688P_XG_ST_DATA, &result->gyro_st_otp[0], 1);
+    ICM42688P_ReadRegister(ICM42688P_YG_ST_DATA, &result->gyro_st_otp[1], 1);
+    ICM42688P_ReadRegister(ICM42688P_ZG_ST_DATA, &result->gyro_st_otp[2], 1);
+
+    // 读取加速度计出厂自检数据（Bank 2）
+    ICM42688P_Bank_Select(2);
+    ICM42688P_ReadRegister(ICM42688P_XA_ST_DATA, &result->accel_st_otp[0], 1);
+    ICM42688P_ReadRegister(ICM42688P_YA_ST_DATA, &result->accel_st_otp[1], 1);
+    ICM42688P_ReadRegister(ICM42688P_ZA_ST_DATA, &result->accel_st_otp[2], 1);
+
+    // 切换回Bank 0
+    ICM42688P_Bank_Select(0);
+
+    // ========================================================================
+    // 步骤5: 验证自检结果（±30%容差）
+    // ========================================================================
+    // 验证陀螺仪自检
+    for (int i = 0; i < 3; i++)
+    {
+        if (result->gyro_st_otp[i] != 0)
+        {
+            // 计算出厂数据对应的实际响应值（根据datasheet计算公式）
+            // ST_OTP 以 LSB 为单位，需要计算实际的自检响应范围
+            int16_t otp_response = (int16_t)result->gyro_st_otp[i];
+            int16_t lower_limit = (int16_t)(otp_response * 0.7);  // -30%
+            int16_t upper_limit = (int16_t)(otp_response * 1.3);  // +30%
+
+            // 判断自检响应是否在范围内
+            if (result->gyro_st_response[i] >= lower_limit &&
+                result->gyro_st_response[i] <= upper_limit)
+            {
+                if (i == 0) result->gyro_x_pass = 1;
+                else if (i == 1) result->gyro_y_pass = 1;
+                else if (i == 2) result->gyro_z_pass = 1;
+            }
+        }
+        else
+        {
+            // 如果出厂数据为0，则只要自检响应不为0就算通过
+            if (result->gyro_st_response[i] != 0)
+            {
+                if (i == 0) result->gyro_x_pass = 1;
+                else if (i == 1) result->gyro_y_pass = 1;
+                else if (i == 2) result->gyro_z_pass = 1;
+            }
+        }
+    }
+
+    // 验证加速度计自检
+    for (int i = 0; i < 3; i++)
+    {
+        if (result->accel_st_otp[i] != 0)
+        {
+            // 计算出厂数据对应的实际响应值
+            int16_t otp_response = (int16_t)result->accel_st_otp[i];
+            int16_t lower_limit = (int16_t)(otp_response * 0.7);  // -30%
+            int16_t upper_limit = (int16_t)(otp_response * 1.3);  // +30%
+
+            // 判断自检响应是否在范围内
+            if (result->accel_st_response[i] >= lower_limit &&
+                result->accel_st_response[i] <= upper_limit)
+            {
+                if (i == 0) result->accel_x_pass = 1;
+                else if (i == 1) result->accel_y_pass = 1;
+                else if (i == 2) result->accel_z_pass = 1;
+            }
+        }
+        else
+        {
+            // 如果出厂数据为0，则只要自检响应不为0就算通过
+            if (result->accel_st_response[i] != 0)
+            {
+                if (i == 0) result->accel_x_pass = 1;
+                else if (i == 1) result->accel_y_pass = 1;
+                else if (i == 2) result->accel_z_pass = 1;
+            }
+        }
+    }
+
+    // 判断整体自检是否通过
+    result->overall_pass = result->gyro_x_pass && result->gyro_y_pass && result->gyro_z_pass &&
+                           result->accel_x_pass && result->accel_y_pass && result->accel_z_pass;
+
+    return 0;
+}
